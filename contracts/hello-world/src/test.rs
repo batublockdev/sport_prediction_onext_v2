@@ -3,7 +3,9 @@
 use super::*;
 use soroban_sdk::{
     log, symbol_short,
-    testutils::{Address as _, AuthorizedFunction, AuthorizedInvocation, Events, Ledger},
+    testutils::{
+        budget::Budget, Address as _, AuthorizedFunction, AuthorizedInvocation, Events, Ledger,
+    },
     vec, Env, IntoVal, TryIntoVal, Val, Vec,
 };
 
@@ -16,6 +18,16 @@ fn test_leaderboard_updates_correctly() {
     // ✅ Convert to Address
     let user1 = Address::generate(&env);
     let user2 = Address::generate(&env);
+    let user3 = Address::generate(&env);
+    let user4 = Address::generate(&env);
+    let user5 = Address::generate(&env);
+    let user6 = Address::generate(&env);
+    let user7 = Address::generate(&env);
+    let user8 = Address::generate(&env);
+    let user9 = Address::generate(&env);
+    let user10 = Address::generate(&env);
+    let user11 = Address::generate(&env);
+    let user12 = Address::generate(&env);
     env.mock_all_auths();
 
     // Deploy contract
@@ -24,12 +36,20 @@ fn test_leaderboard_updates_correctly() {
 
     // User1 stake 100
     client.request_result_summiter(&user1, &100, &1);
-
+    client.request_result_summiter(&user11, &100, &1);
     // User2 stake 200
     client.request_result_summiter(&user2, &200, &1);
 
     // User1 submits again with 300 (should be top)
-    client.request_result_summiter(&user1, &300, &1);
+    client.request_result_summiter(&user3, &350, &1);
+    client.request_result_summiter(&user4, &300, &1);
+    client.request_result_summiter(&user5, &320, &1);
+    client.request_result_summiter(&user6, &300, &1);
+    client.request_result_summiter(&user7, &390, &1);
+    client.request_result_summiter(&user8, &390, &1);
+    client.request_result_summiter(&user9, &396, &1);
+    client.request_result_summiter(&user10, &360, &1);
+
     let x = env.events().all();
     // Read leaderboard
     std::println!("Fuckkkkkk this hsit");
@@ -41,10 +61,17 @@ fn test_leaderboard_updates_correctly() {
             std::println!("Value: {:?}", val);
         }
     }
-    env.ledger().with_mut(|li| {
-        li.sequence_number = 12345; // mock ledger number
-        li.timestamp = 1_726_020_000; // mock Unix timestamp
+    env.clone().ledger().with_mut(|li| {
+        li.sequence_number = 4; // mock ledger number
+        li.timestamp = 72; // mock Unix timestamp
     });
+    env.budget().reset_unlimited();
+
+    let grasa: Vec<(Address, i128)> = client.select_summiter(&1);
+    for val in grasa.iter() {
+        std::println!("Value Select: {:?}", val);
+    }
+
     let sequence = env.ledger().sequence();
     let timestamp = env.ledger().timestamp();
     std::println!("Sequence: {:?}", sequence);

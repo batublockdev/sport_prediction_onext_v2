@@ -16,8 +16,9 @@ struct Game {
     summiters: Vec<Address>,
 }
 
+#[derive(Clone)]
 #[contracttype]
-pub enum RecordGame {
+pub enum DataKey {
     Game(i128),
 }
 
@@ -56,7 +57,7 @@ impl Contract {
         let mut leaderboard: Vec<(Address, i128)> = env
             .storage()
             .persistent()
-            .get(&LEADERBOARD)
+            .get(&DataKey::Game(gameId))
             .unwrap_or(Vec::new(&env));
 
         // Remove old entry for this user
@@ -84,12 +85,49 @@ impl Contract {
         leaderboard.insert(insert_index, (user, new_score));
 
         // Save leaderboard
-        env.storage().persistent().set(&LEADERBOARD, &leaderboard);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Game(gameId), &leaderboard);
         env.events()
             .publish((COUNTER, symbol_short!("increment")), leaderboard);
 
         true
     }
-}
+    pub fn select_summiter(env: Env, game_id: i128) -> Vec<(Address, i128)> {
+        let leaderboard: Vec<(Address, i128)> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Game(game_id))
+            .unwrap_or(Vec::new(&env));
 
+        // Limit to top 5
+        let mut top = Vec::new(&env);
+        for i in 0..10 {
+            if let Some((addr, score)) = leaderboard.get(i) {
+                if score == 0 {
+                    break;
+                }
+                top.push_back((addr.clone(), score));
+            }
+        }
+
+        let sequence = env.ledger().sequence();
+        let timestamp = env.ledger().timestamp() as u32;
+        let mut rng = (sequence + timestamp) % (top.len() as u32);
+
+        let mut selected = Vec::new(&env);
+
+        for _ in 0..5 {
+            let pick = rng % top.len();
+            let (addr, score) = top.get(pick).unwrap();
+            selected.push_back((addr.clone(), score));
+            top.remove(pick); // remove picked
+            if top.len() == 0 {
+                break;
+            }
+        }
+
+        selected
+    }
+}
 mod test;
