@@ -1,6 +1,10 @@
 #![no_std]
+use core::{f32::consts::E, panic};
+
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol, Vec,
+    contract, contractimpl, contracttype, symbol_short, vec,
+    xdr::{ScVal, ToXdr, WriteXdr},
+    Address, Bytes, BytesN, Env, IntoVal, String, Symbol, Vec,
 };
 
 const LEADERBOARD: Symbol = symbol_short!("LB");
@@ -11,17 +15,53 @@ const COUNTER: Symbol = symbol_short!("COUNTER");
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Game {
     id: i128,
-    name: String,
+    league: i128,
     description: String,
-    summiters: Vec<Address>,
+    team_local: i128,
+    team_away: i128,
+    startTime: u32,
+    endTime: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ResultGame {
+    id: i128,
+    gameid: i128,
+    description: String,
+    team_local_score: i128,
+    team_away_score: i128,
+}
+#[contracttype]
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Privatebet {
+    id: i128,
+    gameid: i128,
+    description: String,
+    amount_bet_min: i128,
+    users_invated: Vec<Address>,
+}
+#[contracttype]
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Bet {
+    id: i128,
+    gameid: i128,
+    bet_type: BetKey,
 }
 
 #[derive(Clone)]
 #[contracttype]
 pub enum DataKey {
     Game(i128),
+    PrivateBet(i128),
 }
-
+#[derive(Clone)]
+#[contracttype]
+pub enum BetKey {
+    Team_local,
+    Team_away,
+    Draw,
+}
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Summiter {
@@ -128,6 +168,79 @@ impl Contract {
         }
 
         selected
+    }
+    pub fn bet(env: Env, user: Address, bet: Bet, amount_bet: i128) -> bool {
+        user.require_auth();
+        /*
+        gotta take the game info to stop users from bettin when the game has started
+         */
+        let counter: i128 = env.storage().persistent().get(&COUNTER).unwrap_or(0);
+        let new_bet = privatebet {
+            id: counter + 1,
+            gameid: gameId,
+            description: String::from_slice(&env, "private bet"),
+            amount_bet_min: amount_bet_min,
+            users_invated: users_invated,
+        };
+        env.storage()
+            .persistent()
+            .set(&DataKey::Game(new_bet.id), &new_bet);
+        env.storage().persistent().set(&COUNTER, &(counter + 1));
+        true
+    }
+    //admin address
+    fn set_game(env: Env, game: &Game, signature: BytesN<64>, pub_key: BytesN<32>) {
+        if Self::existBet(env.clone(), game.id) {
+            panic!("Game already exists");
+        }
+        let encoded = game.clone().to_xdr(&env);
+        env.crypto().ed25519_verify(&pub_key, &encoded, &signature);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Game(game.id), game);
+    }
+    fn set_private_bet(
+        env: Env,
+        user: Address,
+        privateData: Privatebet,
+        game: Game,
+        signature: BytesN<64>,
+        pub_key: BytesN<32>,
+    ) {
+        user.require_auth();
+        if !(Self::existBet(env.clone(), game.clone().id)) {
+            panic!("Game haven't been set yet");
+        }
+        Self::set_game(env.clone(), &game, signature, pub_key);
+        if (privateData.id == 0 || privateData.gameid != game.clone().id) {
+            panic!("Invalid private bet data");
+        }
+        env.storage()
+            .persistent()
+            .set(&DataKey::PrivateBet(privateData.id), &privateData);
+    }
+    fn existBet(env: Env, game_id: i128) -> bool {
+        let mut check: bool = false;
+        let receiveGame = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Game(game_id))
+            .unwrap_or(Game {
+                id: 0,
+                league: 0,
+                description: String::from_slice(&env, "No game found"),
+                team_local: 0,
+                team_away: 0,
+                startTime: 0,
+                endTime: 0,
+            });
+
+        if receiveGame.id == 0 {
+            check = false;
+        } else {
+            check = true;
+        }
+        check
     }
 }
 mod test;
