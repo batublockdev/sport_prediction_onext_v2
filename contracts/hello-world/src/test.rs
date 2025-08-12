@@ -28,6 +28,8 @@ fn test_leaderboard_updates_correctly() {
     let user10 = Address::generate(&env);
     let user11 = Address::generate(&env);
     let user12 = Address::generate(&env);
+    let player = Address::generate(&env);
+
     env.mock_all_auths();
 
     // Deploy contract
@@ -66,11 +68,6 @@ fn test_leaderboard_updates_correctly() {
         li.timestamp = 72; // mock Unix timestamp
     });
     env.budget().reset_unlimited();
-
-    let grasa: Vec<(Address, i128)> = client.select_summiter(&1);
-    for val in grasa.iter() {
-        std::println!("Value Select: {:?}", val);
-    }
 
     let sequence = env.ledger().sequence();
     let timestamp = env.ledger().timestamp();
