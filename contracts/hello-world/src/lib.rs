@@ -77,7 +77,7 @@ pub enum DataKey {
     Result(i128),
     ResultAssessment(i128),
     GameSummiters(i128),
-    History(Address),
+    History_Summiter(Address),
     SetPrivateBet(i128),
     SetPublicBet(i128),
     Bet(Address, i128),
@@ -123,7 +123,11 @@ impl Contract {
         user.require_auth();
 
         // ✅ Get history map (user → score history)
-        let history: i128 = env.storage().persistent().get(History(&user)).unwrap_or(10);
+        let history: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::History_Summiter(user.clone()))
+            .unwrap_or(10);
 
         // ✅ Weighted score calculation
         let new_score = (history * 70 + stakeAmount * 30) / 100;
@@ -202,20 +206,44 @@ impl Contract {
             let (addr, score) = top.get(pick).unwrap();
             selected.push_back((addr.clone(), score));
             if k == 0 {
-                env.storage()
-                    .persistent()
-                    .update(&DataKey::Game(game_id), |game: &mut Game| {
+                env.storage().persistent().update(
+                    &DataKey::Game(game_id),
+                    |maybe_game: Option<Game>| {
+                        let mut game = maybe_game.unwrap_or(Game {
+                            id: game_id,
+                            league: 1,
+                            description: String::from_str(&env, ""),
+                            team_local: 0,
+                            team_away: 0,
+                            startTime: 0,
+                            endTime: 0,
+                            summiter: addr.clone(),
+                            Checker: Vec::new(&env),
+                        });
                         game.summiter = addr.clone();
-                    });
+                        game
+                    },
+                );
             }
             if k > 0 {
-                env.storage()
-                    .persistent()
-                    .update(&DataKey::Game(game_id), |game: &mut Game| {
-                        if !game.Checker.contains(&addr) {
-                            game.Checker.push(addr.clone());
-                        }
-                    });
+                env.storage().persistent().update(
+                    &DataKey::Game(game_id),
+                    |maybe_game: Option<Game>| {
+                        let mut game = maybe_game.unwrap_or(Game {
+                            id: game_id,
+                            league: 1,
+                            description: String::from_str(&env, ""),
+                            team_local: 0,
+                            team_away: 0,
+                            startTime: 0,
+                            endTime: 0,
+                            summiter: addr.clone(),
+                            Checker: Vec::new(&env),
+                        });
+                        game.summiter = addr.clone();
+                        game
+                    },
+                );
             }
             top.remove(pick); // remove picked
             if top.len() == 0 {
@@ -225,7 +253,7 @@ impl Contract {
 
         selected
     }
-    pub fn bet(env: Env, user: Address, bet: Bet, amount_bet: i128) -> bool {
+    pub fn bet(env: Env, user: Address, bet: Bet, amount_bet: i128) {
         user.require_auth();
         if amount_bet <= 0 {
             panic!("Bet amount must be greater than 0");
@@ -233,7 +261,8 @@ impl Contract {
         if bet.clone().id == 0 || bet.clone().Setting == 0 {
             panic!("Invalid bet data");
         }
-        if (bet.clone().betType == BetType::Private) {
+
+        if bet.clone().betType == BetType::Private {
             let privateBet: PrivateBet = env
                 .storage()
                 .persistent()
@@ -245,6 +274,7 @@ impl Contract {
                     amount_bet_min: 0,
                     users_invated: Vec::new(&env),
                 });
+
             if privateBet.clone().id == 0 {
                 panic!("Private bet not found");
             }
@@ -254,7 +284,7 @@ impl Contract {
             if amount_bet < privateBet.clone().amount_bet_min {
                 panic!("Bet amount is less than minimum required");
             }
-            let (exist, startTime, endTime) =
+            let (exist, startTime, endTime, _, _) =
                 Self::existBet(env.clone(), privateBet.clone().gameid);
             if !exist {
                 panic!("Game haven't been set yet");
@@ -299,8 +329,10 @@ impl Contract {
     }
     //admin address
     fn set_game(env: Env, game: &Game, signature: BytesN<64>, pub_key: BytesN<32>) {
-        if Self::existBet(env.clone(), game.id) {
-            panic!("Game already exists");
+        let (exist, startTime, endTime, summiter, checkers) =
+            Self::existBet(env.clone(), game.clone().id);
+        if !exist {
+            panic!("Game haven't been set yet");
         }
         let encoded = game.clone().to_xdr(&env);
         env.crypto().ed25519_verify(&pub_key, &encoded, &signature);
@@ -315,11 +347,14 @@ impl Contract {
         env.storage()
             .persistent()
             .set(&DataKey::SetPublicBet(game.id), &pubSetting);
-        select_summiter(env.clone(), game.id);
+        Self::select_summiter(env.clone(), game.id);
     }
     fn set_private_bet(env: Env, user: Address, privateData: PrivateBet, game: Game) {
         user.require_auth();
-        if !(Self::existBet(env.clone(), game.clone().id)) {
+
+        let (exist, startTime, endTime, summiter, checkers) =
+            Self::existBet(env.clone(), game.clone().id);
+        if !exist {
             panic!("Game haven't been set yet");
         }
         if (privateData.id == 0 || privateData.gameid != game.clone().id) {
@@ -343,7 +378,10 @@ impl Contract {
                 team_away: 0,
                 startTime: 0,
                 endTime: 0,
-                summiter: Address::default(),
+                summiter: Address::from_string(&String::from_str(
+                    &env,
+                    "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+                )),
                 Checker: Vec::new(&env),
             });
 
@@ -376,7 +414,7 @@ impl Contract {
 
         env.storage()
             .persistent()
-            .set(&DataKey::Result(game_id), &result);
+            .set(&DataKey::Result(result.clone().gameid), &result);
         result
     }
     fn assessResult(
@@ -419,9 +457,9 @@ impl Contract {
             }
             if resultAssessment.id == 0 {
                 if desition == AssessmentKey::approve {
-                    resultAssessment.UsersApprove.push(user.clone());
+                    resultAssessment.UsersApprove.push_front(user.clone());
                 } else if desition == AssessmentKey::reject {
-                    resultAssessment.UsersReject.push(user.clone());
+                    resultAssessment.UsersReject.push_front(user.clone());
                 }
                 resultAssessment.id = game_id;
                 env.storage().persistent().set(
@@ -430,9 +468,9 @@ impl Contract {
                 );
             } else {
                 if desition == AssessmentKey::approve {
-                    resultAssessment.UsersApprove.push(user.clone());
+                    resultAssessment.UsersApprove.push_front(user.clone());
                 } else if desition == AssessmentKey::reject {
-                    resultAssessment.UsersReject.push(user.clone());
+                    resultAssessment.UsersReject.push_front(user.clone());
                 }
                 env.storage().persistent().update(
                     &DataKey::ResultAssessment(resultAssessment.clone().gameid),
@@ -450,9 +488,9 @@ impl Contract {
             }
             if resultAssessment.id == 0 {
                 if desition == AssessmentKey::approve {
-                    resultAssessment.CheckApprove.push(user.clone());
+                    resultAssessment.CheckApprove.push_front(user.clone());
                 } else if desition == AssessmentKey::reject {
-                    resultAssessment.CheckReject.push(user.clone());
+                    resultAssessment.CheckReject.push_front(user.clone());
                 }
                 resultAssessment.id = game_id;
                 env.storage().persistent().set(
@@ -461,9 +499,9 @@ impl Contract {
                 );
             } else {
                 if desition == AssessmentKey::approve {
-                    resultAssessment.CheckApprove.push(user.clone());
+                    resultAssessment.CheckApprove.push_front(user.clone());
                 } else if desition == AssessmentKey::reject {
-                    resultAssessment.CheckReject.push(user.clone());
+                    resultAssessment.CheckReject.push_front(user.clone());
                 }
                 env.storage().persistent().update(
                     &DataKey::ResultAssessment(resultAssessment.clone().gameid),

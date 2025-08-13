@@ -1,10 +1,12 @@
 #![cfg(test)]
 
 use super::*;
+use ed25519_dalek::{Keypair, Signer};
 use soroban_sdk::{
     log, symbol_short,
     testutils::{
-        budget::Budget, Address as _, AuthorizedFunction, AuthorizedInvocation, Events, Ledger,
+        budget::Budget, Accounts, Address as _, AuthorizedFunction, AuthorizedInvocation, BytesN,
+        Env, Events, IntoVal, Ledger,
     },
     vec, Env, IntoVal, TryIntoVal, Val, Vec,
 };
@@ -68,6 +70,27 @@ fn test_leaderboard_updates_correctly() {
         li.timestamp = 72; // mock Unix timestamp
     });
     env.budget().reset_unlimited();
+
+    // 1. Create a keypair (for signing)
+    let keypair = Keypair::generate(&mut rand::rngs::OsRng);
+    let pub_key_bytes = BytesN::from_array(&env, &keypair.public.to_bytes());
+
+    // 2. Build a Game instance
+    let game = Game {
+        id: 1,
+        name: String::from_str(&env, "Test Game"),
+        // ... fill in all required fields
+    };
+
+    // 3. Serialize game data the same way your signature verification expects
+    let game_bytes = game.clone().into_val(&env).to_xdr(&env);
+
+    // 4. Sign it
+    let signature = keypair.sign(&game_bytes).to_bytes();
+    let signature_bytes = BytesN::from_array(&env, &signature);
+
+    // 5. Call set_game
+    set_game(env.clone(), &game, signature_bytes, pub_key_bytes);
 
     let sequence = env.ledger().sequence();
     let timestamp = env.ledger().timestamp();
