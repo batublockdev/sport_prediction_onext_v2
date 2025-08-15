@@ -10,6 +10,7 @@ use soroban_sdk::{
 const LEADERBOARD: Symbol = symbol_short!("LB");
 const SUMITTERS_HISTORY: Symbol = symbol_short!("H_S");
 const COUNTER: Symbol = symbol_short!("COUNTER");
+const x: Symbol = symbol_short!("x");
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -181,7 +182,7 @@ impl Contract {
         let leaderboard: Vec<(Address, i128)> = env
             .storage()
             .persistent()
-            .get(&DataKey::Game(game_id))
+            .get(&DataKey::GameSummiters(game_id))
             .unwrap_or(Vec::new(&env));
 
         // Limit to top 5
@@ -206,6 +207,8 @@ impl Contract {
             let (addr, score) = top.get(pick).unwrap();
             selected.push_back((addr.clone(), score));
             if k == 0 {
+                env.events().publish((x, symbol_short!("x")), addr.clone());
+
                 env.storage().persistent().update(
                     &DataKey::Game(game_id),
                     |maybe_game: Option<Game>| {
@@ -245,6 +248,7 @@ impl Contract {
                     },
                 );
             }
+
             top.remove(pick); // remove picked
             if top.len() == 0 {
                 break;
@@ -328,17 +332,18 @@ impl Contract {
         }
     }
     //admin address
-    fn set_game(env: Env, game: &Game, signature: BytesN<64>, pub_key: BytesN<32>) {
+    pub fn set_game(env: Env, game: Game, signature: BytesN<64>, pub_key: BytesN<32>) {
         let (exist, startTime, endTime, summiter, checkers) =
             Self::existBet(env.clone(), game.clone().id);
-        if !exist {
-            panic!("Game haven't been set yet");
+        if exist {
+            panic!("Game haven been set already");
         }
         let encoded = game.clone().to_xdr(&env);
+        // Now wrap into Soroban Bytes
         env.crypto().ed25519_verify(&pub_key, &encoded, &signature);
         env.storage()
             .persistent()
-            .set(&DataKey::Game(game.id), game);
+            .set(&DataKey::Game(game.id), &game);
         let pubSetting = PublicBet {
             id: game.id,
             gameid: game.id,
@@ -398,7 +403,7 @@ impl Contract {
             receiveGame.Checker,
         )
     }
-    fn summitResult(env: Env, user: Address, result: ResultGame) -> ResultGame {
+    pub fn summitResult(env: Env, user: Address, result: ResultGame) -> ResultGame {
         user.require_auth();
         let (exist, startTime, endTime, summiter, checkers) =
             Self::existBet(env.clone(), result.clone().gameid);
@@ -433,7 +438,7 @@ impl Contract {
         if endTime > env.ledger().timestamp() as u32 {
             panic!("Game hasn't ended yet");
         }
-        let resultAssessment: ResultAssessment = env
+        let mut resultAssessment: ResultAssessment = env
             .storage()
             .persistent()
             .get(&DataKey::ResultAssessment(game_id))
@@ -472,11 +477,21 @@ impl Contract {
                 } else if desition == AssessmentKey::reject {
                     resultAssessment.UsersReject.push_front(user.clone());
                 }
+
                 env.storage().persistent().update(
                     &DataKey::ResultAssessment(resultAssessment.clone().gameid),
-                    |res: &mut ResultAssessment| {
-                        res.UsersApprove = resultAssessment.UsersApprove.clone();
-                        res.UsersReject = resultAssessment.UsersReject.clone();
+                    |old: Option<ResultAssessment>| {
+                        let mut res = old.unwrap_or(ResultAssessment {
+                            id: resultAssessment.id,
+                            gameid: resultAssessment.gameid,
+                            CheckApprove: Vec::new(&env),
+                            CheckReject: Vec::new(&env),
+                            UsersApprove: Vec::new(&env),
+                            UsersReject: Vec::new(&env),
+                        });
+                        res.UsersApprove = resultAssessment.CheckApprove.clone();
+                        res.UsersReject = resultAssessment.CheckReject.clone();
+                        res
                     },
                 );
             }
@@ -503,11 +518,21 @@ impl Contract {
                 } else if desition == AssessmentKey::reject {
                     resultAssessment.CheckReject.push_front(user.clone());
                 }
+
                 env.storage().persistent().update(
                     &DataKey::ResultAssessment(resultAssessment.clone().gameid),
-                    |res: &mut ResultAssessment| {
+                    |old: Option<ResultAssessment>| {
+                        let mut res = old.unwrap_or(ResultAssessment {
+                            id: resultAssessment.id,
+                            gameid: resultAssessment.gameid,
+                            CheckApprove: Vec::new(&env),
+                            CheckReject: Vec::new(&env),
+                            UsersApprove: Vec::new(&env),
+                            UsersReject: Vec::new(&env),
+                        });
                         res.CheckApprove = resultAssessment.CheckApprove.clone();
                         res.CheckReject = resultAssessment.CheckReject.clone();
+                        res
                     },
                 );
             }

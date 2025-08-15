@@ -1,14 +1,21 @@
 #![cfg(test)]
+#![no_std]
 
+extern crate alloc;
 use super::*;
+use alloc::vec::Vec;
 use ed25519_dalek::{Keypair, Signer};
+use rand::thread_rng;
+use soroban_sdk::Vec as SorobanVec;
 use soroban_sdk::{
     log, symbol_short,
     testutils::{
-        budget::Budget, Accounts, Address as _, AuthorizedFunction, AuthorizedInvocation, BytesN,
-        Env, Events, IntoVal, Ledger,
+        budget::Budget, Address as _, AuthorizedFunction, AuthorizedInvocation, BytesN as _,
+        Events, Ledger,
     },
-    vec, Env, IntoVal, TryIntoVal, Val, Vec,
+    vec,
+    xdr::WriteXdr,
+    Bytes, BytesN, Env, IntoVal, InvokeError, TryIntoVal, Val,
 };
 
 extern crate std;
@@ -54,13 +61,16 @@ fn test_leaderboard_updates_correctly() {
     client.request_result_summiter(&user9, &396, &1);
     client.request_result_summiter(&user10, &360, &1);
 
-    let x = env.events().all();
+    let xx = env.events().all();
+    for e in xx.iter() {
+        std::println!("event: {:?}", e);
+    }
     // Read leaderboard
     std::println!("Fuckkkkkk this hsit");
-    if let Some((contract, symbols, obj)) = x.get(0) {
+    if let Some((contract, symbols, obj)) = xx.get(0) {
         std::println!("Contract: {:?}", contract);
         std::println!("First object: {:?}", obj);
-        let leaderboard: Vec<(Address, i128)> = obj.try_into_val(&env).unwrap();
+        let leaderboard: SorobanVec<(Address, i128)> = obj.try_into_val(&env).unwrap();
         for val in leaderboard.iter() {
             std::println!("Value: {:?}", val);
         }
@@ -71,27 +81,45 @@ fn test_leaderboard_updates_correctly() {
     });
     env.budget().reset_unlimited();
 
-    // 1. Create a keypair (for signing)
-    let keypair = Keypair::generate(&mut rand::rngs::OsRng);
-    let pub_key_bytes = BytesN::from_array(&env, &keypair.public.to_bytes());
-
-    // 2. Build a Game instance
+    // 2. Create the Game object
     let game = Game {
         id: 1,
-        name: String::from_str(&env, "Test Game"),
-        // ... fill in all required fields
+        league: 101,
+        description: String::from_str(&env, "Test Game"),
+        team_local: 10,
+        team_away: 20,
+        startTime: 1111,
+        endTime: 2222,
+        summiter: user1,
+        Checker: soroban_sdk::Vec::new(&env),
     };
+    // 3. Convert the Game object to BytesN
 
-    // 3. Serialize game data the same way your signature verification expects
-    let game_bytes = game.clone().into_val(&env).to_xdr(&env);
+    // Encode game to Bytes (variable length)
+    let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
+    let g: &[u8] = encoded.as_slice();
 
-    // 4. Sign it
-    let signature = keypair.sign(&game_bytes).to_bytes();
-    let signature_bytes = BytesN::from_array(&env, &signature);
+    let signer1 = Keypair::generate(&mut thread_rng());
+    let signer2 = Keypair::generate(&mut thread_rng());
+    let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
-    // 5. Call set_game
-    set_game(env.clone(), &game, signature_bytes, pub_key_bytes);
+    let signaturex: BytesN<64> =
+        BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
+    client.set_game(&game, &signaturex, &public_key);
+    let xx2 = env.events().all();
 
+    for e in xx2.iter() {
+        std::println!("event: {:?}", e);
+    }
+    if let Some((contract, symbols, obj)) = xx2.get(0) {
+        std::println!("Contract: {:?}", contract);
+        std::println!("First object: {:?}", obj);
+        let Gr: Address = obj.try_into_val(&env).unwrap();
+        std::println!("Value: {:?}", Gr);
+        /*for val in leaderboard.iter() {
+            std::println!("Value: {:?}", val);
+        }*/
+    }
     let sequence = env.ledger().sequence();
     let timestamp = env.ledger().timestamp();
     std::println!("Sequence: {:?}", sequence);
