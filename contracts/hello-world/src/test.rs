@@ -76,8 +76,8 @@ fn test_leaderboard_updates_correctly() {
         }
     }
     env.clone().ledger().with_mut(|li| {
-        li.sequence_number = 4; // mock ledger number
-        li.timestamp = 72; // mock Unix timestamp
+        li.sequence_number = 0; // mock ledger number
+        li.timestamp = 0; // mock Unix timestamp
     });
     env.budget().reset_unlimited();
 
@@ -88,9 +88,9 @@ fn test_leaderboard_updates_correctly() {
         description: String::from_str(&env, "Test Game"),
         team_local: 10,
         team_away: 20,
-        startTime: 1111,
-        endTime: 2222,
-        summiter: user1,
+        startTime: 0,
+        endTime: 50,
+        summiter: user1.clone(),
         Checker: soroban_sdk::Vec::new(&env),
     };
     // 3. Convert the Game object to BytesN
@@ -106,19 +106,33 @@ fn test_leaderboard_updates_correctly() {
     let signaturex: BytesN<64> =
         BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
     client.set_game(&game, &signaturex, &public_key);
-    let xx2 = env.events().all();
 
-    for e in xx2.iter() {
-        std::println!("event: {:?}", e);
-    }
-    if let Some((contract, symbols, obj)) = xx2.get(0) {
-        std::println!("Contract: {:?}", contract);
-        std::println!("First object: {:?}", obj);
-        let Gr: Address = obj.try_into_val(&env).unwrap();
-        std::println!("Value: {:?}", Gr);
-        /*for val in leaderboard.iter() {
-            std::println!("Value: {:?}", val);
-        }*/
+    let RD = Bet {
+        id: 1,
+        gameid: 1,
+        betType: BetType::Public,
+        Setting: 1,
+        bet: BetKey::Team_local,
+    };
+    client.bet(&player, &RD, &10);
+    let results = ResultGame {
+        id: 3,
+        gameid: 1,
+        description: String::from_str(&env, "Test Result"),
+        result: BetKey::Team_local,
+        pause: false,
+    };
+    env.clone().ledger().with_mut(|li| {
+        li.sequence_number = 0; // mock ledger number
+        li.timestamp = 75; // mock Unix timestamp
+    });
+    client.summitResult(&user9, &results);
+    client.assessResult(&user3, &RD, &1, &AssessmentKey::approve);
+    client.assessResult(&player, &RD, &1, &AssessmentKey::approve);
+    let trr = client.withdraw(&player, &RD);
+    match trr {
+        true => std::println!("Withdraw successful"),
+        false => std::println!("Withdraw failed"),
     }
     let sequence = env.ledger().sequence();
     let timestamp = env.ledger().timestamp();

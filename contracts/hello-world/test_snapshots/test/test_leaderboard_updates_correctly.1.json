@@ -346,12 +346,13 @@
         }
       ]
     ],
+    [],
     []
   ],
   "ledger": {
     "protocol_version": 22,
-    "sequence_number": 4,
-    "timestamp": 72,
+    "sequence_number": 0,
+    "timestamp": 0,
     "network_id": "0000000000000000000000000000000000000000000000000000000000000000",
     "base_reserve": 0,
     "min_persistent_entry_ttl": 4096,
@@ -769,7 +770,11 @@
                         "symbol": "Checker"
                       },
                       "val": {
-                        "vec": []
+                        "vec": [
+                          {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                          }
+                        ]
                       }
                     },
                     {
@@ -785,7 +790,7 @@
                         "symbol": "endTime"
                       },
                       "val": {
-                        "u32": 2222
+                        "u32": 50
                       }
                     },
                     {
@@ -815,7 +820,7 @@
                         "symbol": "startTime"
                       },
                       "val": {
-                        "u32": 1111
+                        "u32": 0
                       }
                     },
                     {
@@ -854,7 +859,7 @@
             },
             "ext": "v0"
           },
-          4099
+          4095
         ]
       ],
       [
@@ -1131,7 +1136,7 @@
             },
             "ext": "v0"
           },
-          4099
+          4095
         ]
       ],
       [
@@ -1189,29 +1194,5 @@
       ]
     ]
   },
-  "events": [
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "000000000000000000000000000000000000000000000000000000000000000e",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "x"
-              },
-              {
-                "symbol": "x"
-              }
-            ],
-            "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
-            }
-          }
-        }
-      },
-      "failed_call": false
-    }
-  ]
+  "events": []
 }

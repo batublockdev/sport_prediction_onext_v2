@@ -205,10 +205,9 @@ impl Contract {
         for k in 0..5 {
             let pick = rng % top.len();
             let (addr, score) = top.get(pick).unwrap();
+            let mut checks: Vec<Address> = Vec::new(&env);
             selected.push_back((addr.clone(), score));
             if k == 0 {
-                env.events().publish((x, symbol_short!("x")), addr.clone());
-
                 env.storage().persistent().update(
                     &DataKey::Game(game_id),
                     |maybe_game: Option<Game>| {
@@ -229,25 +228,26 @@ impl Contract {
                 );
             }
             if k > 0 {
-                env.storage().persistent().update(
-                    &DataKey::Game(game_id),
-                    |maybe_game: Option<Game>| {
-                        let mut game = maybe_game.unwrap_or(Game {
-                            id: game_id,
-                            league: 1,
-                            description: String::from_str(&env, ""),
-                            team_local: 0,
-                            team_away: 0,
-                            startTime: 0,
-                            endTime: 0,
-                            summiter: addr.clone(),
-                            Checker: Vec::new(&env),
-                        });
-                        game.summiter = addr.clone();
-                        game
-                    },
-                );
+                checks.push_back(addr.clone());
             }
+            env.storage().persistent().update(
+                &DataKey::Game(game_id),
+                |maybe_game: Option<Game>| {
+                    let mut game = maybe_game.unwrap_or(Game {
+                        id: game_id,
+                        league: 1,
+                        description: String::from_str(&env, ""),
+                        team_local: 0,
+                        team_away: 0,
+                        startTime: 0,
+                        endTime: 0,
+                        summiter: addr.clone(),
+                        Checker: Vec::new(&env),
+                    });
+                    game.Checker = checks.clone();
+                    game
+                },
+            );
 
             top.remove(pick); // remove picked
             if top.len() == 0 {
@@ -299,6 +299,9 @@ impl Contract {
             if endTime < env.ledger().timestamp() as u32 {
                 panic!("Game has already ended");
             }
+            if !Self::CheckUser(env.clone(), user.clone(), privateBet.clone().gameid) {
+                panic!("You are not allowed to bet on this game");
+            }
             env.storage()
                 .persistent()
                 .set(&DataKey::Bet(user.clone(), bet.clone().id), &bet);
@@ -325,6 +328,9 @@ impl Contract {
             }
             if endTime < env.ledger().timestamp() as u32 {
                 panic!("Game has already ended");
+            }
+            if !Self::CheckUser(env.clone(), user.clone(), publicBet.clone().gameid) {
+                panic!("You are not allowed to bet on this game");
             }
             env.storage()
                 .persistent()
@@ -369,6 +375,34 @@ impl Contract {
             .persistent()
             .set(&DataKey::SetPrivateBet(privateData.id), &privateData);
     }
+    fn CheckUser(env: Env, user: Address, game_id: i128) -> bool {
+        let mut check: bool = false;
+        let receiveGame = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Game(game_id))
+            .unwrap_or(Game {
+                id: 0,
+                league: 0,
+                description: String::from_slice(&env, "No game found"),
+                team_local: 0,
+                team_away: 0,
+                startTime: 0,
+                endTime: 0,
+                summiter: Address::from_string(&String::from_str(
+                    &env,
+                    "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+                )),
+                Checker: Vec::new(&env),
+            });
+
+        if receiveGame.summiter != user && !receiveGame.Checker.contains(&user) {
+            check = false;
+        } else {
+            check = true;
+        }
+        check
+    }
     fn existBet(env: Env, game_id: i128) -> (bool, u32, u32, Address, Vec<Address>) {
         let mut check: bool = false;
         let receiveGame = env
@@ -410,9 +444,10 @@ impl Contract {
         if !exist {
             panic!("Game haven't been set yet");
         }
-        if user != summiter {
-            panic!("You are not the summiter for this game");
+        if summiter != user {
+            panic!("You are not allowed to summit this result");
         }
+
         if endTime > env.ledger().timestamp() as u32 {
             panic!("Game hasn't ended yet");
         }
@@ -422,13 +457,7 @@ impl Contract {
             .set(&DataKey::Result(result.clone().gameid), &result);
         result
     }
-    fn assessResult(
-        env: Env,
-        user: Address,
-        bet: Bet,
-        game_id: i128,
-        desition: AssessmentKey,
-    ) -> ResultAssessment {
+    pub fn assessResult(env: Env, user: Address, bet: Bet, game_id: i128, desition: AssessmentKey) {
         user.require_auth();
         let (exist, startTime, endTime, summiter, checkers) =
             Self::existBet(env.clone(), game_id.clone());
@@ -438,6 +467,14 @@ impl Contract {
         if endTime > env.ledger().timestamp() as u32 {
             panic!("Game hasn't ended yet");
         }
+        if endTime + (5 * 60 * 60) < env.ledger().timestamp() as u32 {
+            panic!("Game hasn't ended yet");
+        }
+        let mut results: ResultGame = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Result(game_id))
+            .unwrap_or_else(|| panic!("No result found for this game"));
         let mut resultAssessment: ResultAssessment = env
             .storage()
             .persistent()
@@ -451,7 +488,8 @@ impl Contract {
                 UsersReject: Vec::new(&env),
             });
         if !checkers.contains(&user) {
-            env.storage()
+            let betResult: Bet = env
+                .storage()
                 .persistent()
                 .get(&DataKey::Bet(user.clone(), bet.clone().id))
                 .unwrap_or_else(|| panic!("You are not allowed to assess this result"));
@@ -465,6 +503,7 @@ impl Contract {
                     resultAssessment.UsersApprove.push_front(user.clone());
                 } else if desition == AssessmentKey::reject {
                     resultAssessment.UsersReject.push_front(user.clone());
+                    results.pause = true;
                 }
                 resultAssessment.id = game_id;
                 env.storage().persistent().set(
@@ -476,6 +515,7 @@ impl Contract {
                     resultAssessment.UsersApprove.push_front(user.clone());
                 } else if desition == AssessmentKey::reject {
                     resultAssessment.UsersReject.push_front(user.clone());
+                    results.pause = true;
                 }
 
                 env.storage().persistent().update(
@@ -489,12 +529,26 @@ impl Contract {
                             UsersApprove: Vec::new(&env),
                             UsersReject: Vec::new(&env),
                         });
-                        res.UsersApprove = resultAssessment.CheckApprove.clone();
-                        res.UsersReject = resultAssessment.CheckReject.clone();
+                        res.UsersApprove = resultAssessment.UsersApprove.clone();
+                        res.UsersReject = resultAssessment.UsersReject.clone();
                         res
                     },
                 );
             }
+            env.storage().persistent().update(
+                &DataKey::Result(game_id),
+                |old: Option<ResultGame>| {
+                    let mut res = old.unwrap_or(ResultGame {
+                        id: results.id,
+                        gameid: results.gameid,
+                        description: String::from_str(&env, ""),
+                        result: BetKey::Team_local,
+                        pause: false,
+                    });
+                    res.pause = results.pause;
+                    res
+                },
+            );
         } else {
             if resultAssessment.CheckApprove.contains(&user)
                 || resultAssessment.CheckReject.contains(&user)
@@ -542,30 +596,45 @@ impl Contract {
             &DataKey::ResultAssessment(resultAssessment.clone().gameid),
             &resultAssessment,
         );
-        resultAssessment
     }
 
-    fn withdraw(env: Env, user: Address, bet: Bet) -> bool {
+    pub fn withdraw(env: Env, user: Address, bet: Bet) -> bool {
         user.require_auth();
-        let result: ResultGame = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Result(bet.clone().gameid))
-            .unwrap_or_else(|| panic!("No result found for this game"));
-        if result.pause {
-            panic!("Game result is paused, you cannot withdraw now");
-        }
         let betData: Bet = env
             .storage()
             .persistent()
             .get(&DataKey::Bet(user.clone(), bet.clone().id))
             .unwrap_or_else(|| panic!("No bet found for this user"));
+        let xresult: ResultGame = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Result(bet.clone().gameid))
+            .unwrap_or_else(|| panic!("No result found for this game"));
+        if xresult.pause == true {
+            panic!("Game result is paused, you cannot withdraw now");
+        }
+        let assesments: ResultAssessment = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ResultAssessment(bet.clone().gameid))
+            .unwrap_or(ResultAssessment {
+                id: 0,
+                gameid: bet.clone().gameid,
+                CheckApprove: Vec::new(&env),
+                CheckReject: Vec::new(&env),
+                UsersApprove: Vec::new(&env),
+                UsersReject: Vec::new(&env),
+            });
 
-        if betData.bet != result.result {
+        if !assesments.UsersApprove.contains(&user) && !assesments.UsersReject.contains(&user) {
+            panic!("You are not allowed to withdraw from this bet");
+        }
+        if betData.bet != xresult.result {
             false
         } else {
             true
         }
     }
+    //set result by Supreme Court
 }
 mod test;
