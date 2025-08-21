@@ -38,6 +38,7 @@ fn test_leaderboard_updates_correctly() {
     let user11 = Address::generate(&env);
     let user12 = Address::generate(&env);
     let player = Address::generate(&env);
+    let playerx = Address::generate(&env);
 
     env.mock_all_auths();
 
@@ -113,8 +114,27 @@ fn test_leaderboard_updates_correctly() {
         betType: BetType::Public,
         Setting: 1,
         bet: BetKey::Team_local,
+        amount_bet: 1500,
     };
-    client.bet(&player, &RD, &10);
+    client.bet(&player, &RD);
+    let RD2 = Bet {
+        id: 2,
+        gameid: 1,
+        betType: BetType::Public,
+        Setting: 1,
+        bet: BetKey::Team_away,
+        amount_bet: 2000,
+    };
+    client.bet(&playerx, &RD2);
+    let RD3 = Bet {
+        id: 3,
+        gameid: 1,
+        betType: BetType::Public,
+        Setting: 1,
+        bet: BetKey::Team_away,
+        amount_bet: 3000,
+    };
+    client.bet(&user12, &RD3);
     let results = ResultGame {
         id: 3,
         gameid: 1,
@@ -128,12 +148,23 @@ fn test_leaderboard_updates_correctly() {
     });
     client.summitResult(&user9, &results);
     client.assessResult(&user3, &RD, &1, &AssessmentKey::approve);
-    client.assessResult(&player, &RD, &1, &AssessmentKey::approve);
-    let trr = client.withdraw(&player, &RD);
-    match trr {
-        true => std::println!("Withdraw successful"),
-        false => std::println!("Withdraw failed"),
-    }
+    client.assessResult(&player, &RD, &1, &AssessmentKey::reject);
+    client.assessResult(&playerx, &RD2, &1, &AssessmentKey::reject);
+    client.assessResult(&user12, &RD3, &1, &AssessmentKey::reject);
+    let resultsx = ResultGame {
+        id: 3,
+        gameid: 1,
+        description: String::from_str(&env, "Test Result"),
+        result: BetKey::Team_away,
+        pause: false,
+    };
+    client.setResult_supremCourt(&user1, &resultsx);
+    let earnPlayer = client.claim(&player, &RD);
+    std::println!("Earned by Player: {:?}", earnPlayer);
+    let earnPlayerx = client.claim(&playerx, &RD2);
+    std::println!("Earned by Playerx: {:?}", earnPlayerx);
+    let earnUser12 = client.claim(&user12, &RD3);
+    std::println!("Earned by User12: {:?}", earnUser12);
     let sequence = env.ledger().sequence();
     let timestamp = env.ledger().timestamp();
     std::println!("Sequence: {:?}", sequence);
