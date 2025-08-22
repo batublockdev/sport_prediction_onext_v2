@@ -39,6 +39,7 @@ fn test_leaderboard_updates_correctly() {
     let user12 = Address::generate(&env);
     let player = Address::generate(&env);
     let playerx = Address::generate(&env);
+    let playerx2 = Address::generate(&env);
 
     env.mock_all_auths();
 
@@ -85,6 +86,7 @@ fn test_leaderboard_updates_correctly() {
     // 2. Create the Game object
     let game = Game {
         id: 1,
+        active: false,
         league: 101,
         description: String::from_str(&env, "Test Game"),
         team_local: 10,
@@ -113,7 +115,7 @@ fn test_leaderboard_updates_correctly() {
         gameid: 1,
         betType: BetType::Public,
         Setting: 1,
-        bet: BetKey::Team_local,
+        bet: BetKey::Team_away,
         amount_bet: 1500,
     };
     client.bet(&player, &RD);
@@ -135,6 +137,15 @@ fn test_leaderboard_updates_correctly() {
         amount_bet: 3000,
     };
     client.bet(&user12, &RD3);
+    let RD4 = Bet {
+        id: 4,
+        gameid: 1,
+        betType: BetType::Public,
+        Setting: 1,
+        bet: BetKey::Draw,
+        amount_bet: 3000,
+    };
+    client.bet(&playerx2, &RD4);
     let results = ResultGame {
         id: 3,
         gameid: 1,
@@ -165,6 +176,8 @@ fn test_leaderboard_updates_correctly() {
     std::println!("Earned by Playerx: {:?}", earnPlayerx);
     let earnUser12 = client.claim(&user12, &RD3);
     std::println!("Earned by User12: {:?}", earnUser12);
+    let earnPlayerx2 = client.claim(&playerx2, &RD4);
+    std::println!("Earned by Playerx2: {:?}", earnPlayerx2);
     let sequence = env.ledger().sequence();
     let timestamp = env.ledger().timestamp();
     std::println!("Sequence: {:?}", sequence);

@@ -16,6 +16,7 @@ const x: Symbol = symbol_short!("x");
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Game {
     id: i128,
+    active: bool,
     league: i128,
     description: String,
     team_local: i128,
@@ -57,6 +58,12 @@ struct PrivateBet {
 }
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
+struct LastB {
+    id: i128,
+    lastBet: BetKey,
+}
+#[contracttype]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct PublicBet {
     id: i128,
     gameid: i128,
@@ -88,7 +95,8 @@ pub enum DataKey {
     SetPublicBet(i128),
     Bet(Address, i128),
     PrivateBetList(i128),
-    lastBet(BetKey),
+    lastBet(i128),
+    ListBetUser(i128),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[contracttype]
@@ -189,8 +197,8 @@ impl Contract {
 
         true
     }
-    pub fn select_summiter(env: Env, game_id: i128) -> Vec<(Address, i128)> {
-        let (exist, startTime, endTime, summiter, checkers) =
+    fn select_summiter(env: Env, game_id: i128) {
+        let (exist, startTime, endTime, summiter, checkers, _) =
             Self::existBet(env.clone(), game_id.clone());
         if !exist {
             panic!("Game haven't been set yet");
@@ -229,6 +237,7 @@ impl Contract {
                     |maybe_game: Option<Game>| {
                         let mut game = maybe_game.unwrap_or(Game {
                             id: game_id,
+                            active: true,
                             league: 1,
                             description: String::from_str(&env, ""),
                             team_local: 0,
@@ -239,6 +248,7 @@ impl Contract {
                             Checker: Vec::new(&env),
                         });
                         game.summiter = addr.clone();
+                        game.active = true;
                         game
                     },
                 );
@@ -251,6 +261,7 @@ impl Contract {
                 |maybe_game: Option<Game>| {
                     let mut game = maybe_game.unwrap_or(Game {
                         id: game_id,
+                        active: true,
                         league: 1,
                         description: String::from_str(&env, ""),
                         team_local: 0,
@@ -270,8 +281,6 @@ impl Contract {
                 break;
             }
         }
-
-        selected
     }
     pub fn bet(env: Env, user: Address, bet: Bet) {
         user.require_auth();
@@ -305,7 +314,7 @@ impl Contract {
             if bet.clone().amount_bet < privateBet.clone().amount_bet_min {
                 panic!("Bet amount is less than minimum required");
             }
-            let (exist, startTime, endTime, _, _) =
+            let (exist, startTime, endTime, _, _, active) =
                 Self::existBet(env.clone(), privateBet.clone().gameid);
             if !exist {
                 panic!("Game haven't been set yet");
@@ -331,6 +340,58 @@ impl Contract {
             env.storage()
                 .persistent()
                 .set(&DataKey::Bet(user.clone(), bet.clone().Setting), &bet);
+            if !privateBet.active {
+                let lastBet: LastB = env
+                    .storage()
+                    .persistent()
+                    .get(&DataKey::lastBet(bet.clone().Setting))
+                    .unwrap_or(LastB {
+                        id: 0,
+                        lastBet: BetKey::Team_local,
+                    });
+                if lastBet.clone().id == 0 {
+                    // it means this is the fisrt bet for this setting
+                    env.storage().persistent().set(
+                        &DataKey::lastBet(bet.clone().Setting),
+                        &LastB {
+                            id: bet.clone().Setting,
+                            lastBet: bet.clone().bet,
+                        },
+                    );
+                } else {
+                    if lastBet.lastBet != bet.clone().bet {
+                        env.storage().persistent().update(
+                            &DataKey::SetPrivateBet(bet.clone().Setting),
+                            |old: Option<PrivateBet>| {
+                                let mut res = old.unwrap_or(PrivateBet {
+                                    id: privateBet.id,
+                                    gameid: privateBet.gameid,
+                                    active: false,
+                                    description: privateBet.description.clone(),
+                                    amount_bet_min: privateBet.amount_bet_min,
+                                    users_invated: privateBet.users_invated.clone(),
+                                });
+                                res.active = true;
+                                res
+                            },
+                        );
+                        env.storage().persistent().update(
+                            &DataKey::lastBet(bet.clone().Setting),
+                            |old: Option<LastB>| {
+                                let mut res = old.unwrap_or(LastB {
+                                    id: lastBet.id,
+                                    lastBet: BetKey::Team_local,
+                                });
+                                res.lastBet = bet.clone().bet;
+                                res
+                            },
+                        );
+                        if active == false {
+                            Self::select_summiter(env.clone(), privateBet.gameid)
+                        }
+                    }
+                }
+            }
         } else if (bet.clone().betType == BetType::Public) {
             let publicBet: PublicBet = env
                 .storage()
@@ -345,7 +406,7 @@ impl Contract {
             if publicBet.clone().id == 0 {
                 panic!("Public bet not found");
             }
-            let (exist, startTime, endTime, _, _) =
+            let (exist, startTime, endTime, _, _, active) =
                 Self::existBet(env.clone(), publicBet.clone().gameid);
             if !exist {
                 panic!("Game haven't been set yet");
@@ -362,14 +423,74 @@ impl Contract {
             env.storage()
                 .persistent()
                 .set(&DataKey::Bet(user.clone(), bet.clone().Setting), &bet);
+            let mut listedBetAddress: Vec<(Address)> = env
+                .storage()
+                .persistent()
+                .get(&DataKey::ListBetUser(bet.clone().gameid))
+                .unwrap_or(Vec::new(&env));
+            listedBetAddress.push_back(user.clone());
+            env.storage()
+                .persistent()
+                .set(&DataKey::ListBetUser(bet.clone().gameid), &listedBetAddress);
+
+            if !publicBet.active {
+                let lastBet: LastB = env
+                    .storage()
+                    .persistent()
+                    .get(&DataKey::lastBet(bet.clone().Setting))
+                    .unwrap_or(LastB {
+                        id: 0,
+                        lastBet: BetKey::Team_local,
+                    });
+                if lastBet.clone().id == 0 {
+                    // it means this is the fisrt bet for this setting
+                    env.storage().persistent().set(
+                        &DataKey::lastBet(bet.clone().Setting),
+                        &LastB {
+                            id: bet.clone().Setting,
+                            lastBet: bet.clone().bet,
+                        },
+                    );
+                } else {
+                    if lastBet.lastBet != bet.clone().bet {
+                        env.storage().persistent().update(
+                            &DataKey::SetPublicBet(bet.clone().Setting),
+                            |old: Option<PublicBet>| {
+                                let mut res = old.unwrap_or(PublicBet {
+                                    id: publicBet.id,
+                                    gameid: publicBet.gameid,
+                                    active: false,
+                                    description: publicBet.description.clone(),
+                                });
+                                res.active = true;
+                                res
+                            },
+                        );
+                        env.storage().persistent().update(
+                            &DataKey::lastBet(bet.clone().Setting),
+                            |old: Option<LastB>| {
+                                let mut res = old.unwrap_or(LastB {
+                                    id: lastBet.id,
+                                    lastBet: BetKey::Team_local,
+                                });
+                                res.lastBet = bet.clone().bet;
+                                res
+                            },
+                        );
+                        if active == false {
+                            Self::select_summiter(env.clone(), publicBet.gameid)
+                        }
+                    }
+                }
+            }
         }
     }
     //admin address
     pub fn set_game(env: Env, game: Game, signature: BytesN<64>, pub_key: BytesN<32>) {
-        let (exist, startTime, endTime, summiter, checkers) =
+        let (exist, startTime, endTime, summiter, checkers, _) =
             Self::existBet(env.clone(), game.clone().id);
         if exist {
-            panic!("Game haven been set already");
+            panic!("Game have been set already");
         }
         let encoded = game.clone().to_xdr(&env);
         // Now wrap into Soroban Bytes
@@ -386,12 +507,11 @@ impl Contract {
         env.storage()
             .persistent()
             .set(&DataKey::SetPublicBet(game.id), &pubSetting);
-        Self::select_summiter(env.clone(), game.id);
     }
     fn set_private_bet(env: Env, user: Address, privateData: PrivateBet, game: Game) {
         user.require_auth();
 
-        let (exist, startTime, endTime, summiter, checkers) =
+        let (exist, startTime, endTime, summiter, checkers, _) =
             Self::existBet(env.clone(), game.clone().id);
         if !exist {
             panic!("Game haven't been set yet");
@@ -411,6 +531,7 @@ impl Contract {
             .get(&DataKey::Game(game_id))
             .unwrap_or(Game {
                 id: 0,
+                active: false,
                 league: 0,
                 description: String::from_slice(&env, "No game found"),
                 team_local: 0,
@@ -431,7 +552,7 @@ impl Contract {
         }
         check
     }
-    fn existBet(env: Env, game_id: i128) -> (bool, u32, u32, Address, Vec<Address>) {
+    fn existBet(env: Env, game_id: i128) -> (bool, u32, u32, Address, Vec<Address>, bool) {
         let mut check: bool = false;
         let receiveGame = env
             .storage()
@@ -439,6 +560,7 @@ impl Contract {
             .get(&DataKey::Game(game_id))
             .unwrap_or(Game {
                 id: 0,
+                active: false,
                 league: 0,
                 description: String::from_slice(&env, "No game found"),
                 team_local: 0,
@@ -463,11 +585,12 @@ impl Contract {
             receiveGame.endTime,
             receiveGame.summiter,
             receiveGame.Checker,
+            receiveGame.active,
         )
     }
     pub fn summitResult(env: Env, user: Address, result: ResultGame) -> ResultGame {
         user.require_auth();
-        let (exist, startTime, endTime, summiter, checkers) =
+        let (exist, startTime, endTime, summiter, checkers, active) =
             Self::existBet(env.clone(), result.clone().gameid);
         if !exist {
             panic!("Game haven't been set yet");
@@ -493,7 +616,7 @@ impl Contract {
     }
     pub fn assessResult(env: Env, user: Address, bet: Bet, game_id: i128, desition: AssessmentKey) {
         user.require_auth();
-        let (exist, startTime, endTime, summiter, checkers) =
+        let (exist, startTime, endTime, summiter, checkers, _) =
             Self::existBet(env.clone(), game_id.clone());
         if !exist {
             panic!("Game haven't been set yet");
@@ -504,6 +627,7 @@ impl Contract {
         if endTime + (5 * 60 * 60) < env.ledger().timestamp() as u32 {
             panic!("Game hasn't ended yet");
         }
+
         let mut results: ResultGame = env
             .storage()
             .persistent()
@@ -648,22 +772,7 @@ impl Contract {
         if xresult.pause == true {
             panic!("Game result is paused, you cannot withdraw now");
         }
-        let assesments: ResultAssessment = env
-            .storage()
-            .persistent()
-            .get(&DataKey::ResultAssessment(bet.clone().gameid))
-            .unwrap_or(ResultAssessment {
-                id: 0,
-                gameid: bet.clone().gameid,
-                CheckApprove: Vec::new(&env),
-                CheckReject: Vec::new(&env),
-                UsersApprove: Vec::new(&env),
-                UsersReject: Vec::new(&env),
-            });
 
-        if !assesments.UsersApprove.contains(&user) && !assesments.UsersReject.contains(&user) {
-            panic!("You are not allowed to withdraw from this bet");
-        }
         let money: i128 = env
             .storage()
             .persistent()
@@ -702,7 +811,22 @@ impl Contract {
             .get(&DataKey::PrivateBetList(result.clone().gameid))
             .unwrap_or(Vec::new(&env));
         Self::distibution(env.clone(), complain, result.clone().gameid, result.clone());
-        /*for setting in listedPrivateBet.iter() {
+        for setting in listedPrivateBet.iter() {
+            let privateBet: PrivateBet = env
+                .storage()
+                .persistent()
+                .get(&DataKey::SetPrivateBet(setting.clone()))
+                .unwrap_or(PrivateBet {
+                    id: 0,
+                    gameid: 0,
+                    active: false,
+                    description: String::from_slice(&env, "No private bet found"),
+                    amount_bet_min: 0,
+                    users_invated: Vec::new(&env),
+                });
+            if privateBet.active == false {
+                continue;
+            }
             Self::distibution_private(
                 env.clone(),
                 complain,
@@ -710,7 +834,7 @@ impl Contract {
                 result.clone(),
                 setting.clone(),
             );
-        }*/
+        }
         env.storage()
             .persistent()
             .set(&DataKey::Result(result.clone().gameid), &result);
@@ -720,6 +844,47 @@ impl Contract {
     2. users who act dishonestly will lose their bet amount
     3. summiters with wrong result will lose their stake
      */
+    pub fn execute_distribution(env: Env, gameId: i128) {
+        let complain = 2; // 2 means no complain was made
+        let xresult: ResultGame = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Result(gameId.clone()))
+            .unwrap_or_else(|| panic!("No result found for this game"));
+        if xresult.pause == true {
+            panic!("Game result was paused ");
+        }
+        let listedPrivateBet: Vec<(i128)> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PrivateBetList(gameId.clone()))
+            .unwrap_or(Vec::new(&env));
+        Self::distibution(env.clone(), complain, gameId.clone(), xresult.clone());
+        for setting in listedPrivateBet.iter() {
+            let privateBet: PrivateBet = env
+                .storage()
+                .persistent()
+                .get(&DataKey::SetPrivateBet(setting.clone()))
+                .unwrap_or(PrivateBet {
+                    id: 0,
+                    gameid: 0,
+                    active: false,
+                    description: String::from_slice(&env, "No private bet found"),
+                    amount_bet_min: 0,
+                    users_invated: Vec::new(&env),
+                });
+            if privateBet.active == false {
+                continue;
+            }
+            Self::distibution_private(
+                env.clone(),
+                complain,
+                xresult.clone().gameid,
+                xresult.clone(),
+                setting.clone(),
+            );
+        }
+    }
     fn distibution(env: Env, complain: i128, game_id: i128, result: ResultGame) {
         let mut winners: Vec<Address> = Vec::new(&env);
         let mut losers: Vec<Address> = Vec::new(&env);
@@ -731,12 +896,11 @@ impl Contract {
 
         let mut amount_gained: i128 = 0;
         let mut amount_winner_pool: i128 = 0;
-
-        let listedPrivateBet: Vec<(i128)> = env
+        let game: Game = env
             .storage()
             .persistent()
-            .get(&DataKey::PrivateBetList(game_id.clone()))
-            .unwrap_or(Vec::new(&env));
+            .get(&DataKey::Game(game_id.clone()))
+            .unwrap_or_else(|| panic!("No game found for this id"));
         let assesments: ResultAssessment = env
             .storage()
             .persistent()
@@ -749,16 +913,71 @@ impl Contract {
                 UsersApprove: Vec::new(&env),
                 UsersReject: Vec::new(&env),
             });
+        let listedBetAddress: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ListBetUser(game_id.clone()))
+            .unwrap_or(Vec::new(&env));
+        if listedBetAddress.len() == 0 {
+            panic!("No bets found for this game");
+        } else {
+            // if only one user bet, he is the winner
+            for user in listedBetAddress.iter() {
+                if !assesments.UsersApprove.contains(&user)
+                    && !assesments.UsersReject.contains(&user)
+                {
+                    let bet: Bet = env
+                        .storage()
+                        .persistent()
+                        .get(&DataKey::Bet(user.clone(), game_id.clone()))
+                        .unwrap_or(Bet {
+                            id: 0,
+                            gameid: 0,
+                            betType: BetType::Public,
+                            Setting: 0,
+                            bet: BetKey::Team_local,
+                            amount_bet: 0,
+                        });
+
+                    if bet.bet == result.result {
+                        let amount_bet_withFine = (bet.amount_bet * 50) / 100;
+                        amount_winner_pool += amount_bet_withFine;
+                        env.storage()
+                            .persistent()
+                            .set(&DataKey::ClaimWinner(user.clone()), &amount_bet_withFine);
+                        //users lose some trust
+                        continue;
+                    } else {
+                        losers.push_back(user.clone());
+                        amount_gained += bet.amount_bet;
+                        //user loses the trust coins too
+                        continue;
+                    }
+                }
+            }
+        }
         if complain == 0 {
             dishonest = assesments.UsersApprove.clone();
             s_honest = assesments.CheckReject.clone();
             s_dishonest = assesments.CheckApprove.clone();
+            s_dishonest.push_back(game.summiter.clone());
             honest = assesments.UsersReject.clone();
-        } else {
+        }
+        if complain == 1 {
+            // if the complain was incorrect
             dishonest = assesments.UsersReject.clone();
             s_honest = assesments.CheckApprove.clone();
+            s_honest.push_back(game.summiter.clone());
             s_dishonest = assesments.CheckReject.clone();
             honest = assesments.UsersApprove.clone();
+        }
+        if complain == 2 {
+            // if the complain was not made
+            honest = assesments.UsersApprove.clone();
+            dishonest = assesments.UsersReject.clone();
+            s_dishonest = assesments.CheckReject.clone();
+            s_honest = assesments.CheckApprove.clone();
+            s_honest.push_back(game.summiter.clone());
         }
 
         for user in dishonest.iter() {
@@ -816,32 +1035,58 @@ impl Contract {
         amount_gained -= protocol_retribution;
         let add = 20 * s_dishonest.len() as i128;
         summiter_retribution += add;
-
-        for user in winners.iter() {
-            let bet: Bet = env
-                .storage()
-                .persistent()
-                .get(&DataKey::Bet(user.clone(), game_id.clone()))
-                .unwrap_or(Bet {
-                    id: 0,
-                    gameid: 0,
-                    betType: BetType::Public,
-                    Setting: 0,
-                    bet: BetKey::Team_local,
-                    amount_bet: 0,
-                });
-
-            if bet.id == 0 {
-                continue;
-            } else {
-                let user_share = (bet.amount_bet * 100) / amount_winner_pool;
-
-                let user_amount = (user_share * amount_gained) / 100;
-                let total = user_amount + bet.amount_bet;
-                //send user_amount to user
-                env.storage()
+        if winners.len() == 0 {
+            for loser in losers.iter() {
+                let bet: Bet = env
+                    .storage()
                     .persistent()
-                    .set(&DataKey::ClaimWinner(user.clone()), &total);
+                    .get(&DataKey::Bet(loser.clone(), game_id.clone()))
+                    .unwrap_or(Bet {
+                        id: 0,
+                        gameid: 0,
+                        betType: BetType::Public,
+                        Setting: 0,
+                        bet: BetKey::Team_local,
+                        amount_bet: 0,
+                    });
+                if bet.id == 0 {
+                    continue;
+                } else {
+                    //send user amount to user
+                    let user_amount = (30 * bet.clone().amount_bet) / 100;
+                    let amount_pay = bet.clone().amount_bet - user_amount;
+                    env.storage()
+                        .persistent()
+                        .set(&DataKey::ClaimWinner(loser.clone()), &amount_pay);
+                }
+            }
+        } else {
+            for user in winners.iter() {
+                let bet: Bet = env
+                    .storage()
+                    .persistent()
+                    .get(&DataKey::Bet(user.clone(), game_id.clone()))
+                    .unwrap_or(Bet {
+                        id: 0,
+                        gameid: 0,
+                        betType: BetType::Public,
+                        Setting: 0,
+                        bet: BetKey::Team_local,
+                        amount_bet: 0,
+                    });
+
+                if bet.id == 0 {
+                    continue;
+                } else {
+                    let user_share = (bet.amount_bet * 100) / amount_winner_pool;
+
+                    let user_amount = (user_share * amount_gained) / 100;
+                    let total = user_amount + bet.amount_bet;
+                    //send user_amount to user
+                    env.storage()
+                        .persistent()
+                        .set(&DataKey::ClaimWinner(user.clone()), &total);
+                }
             }
         }
         for s_user in s_dishonest.iter() {
@@ -850,7 +1095,7 @@ impl Contract {
                 .set(&DataKey::History_Summiter(s_user), &-100);
         }
         let mut each_summiter_share = 0;
-        if s_honest.len() != 0 {
+        if s_honest.len() > 0 {
             each_summiter_share = summiter_retribution / s_honest.len() as i128;
         }
         let total_summiter = each_summiter_share + 20;
@@ -873,13 +1118,30 @@ impl Contract {
     ) {
         let mut winners: Vec<Address> = Vec::new(&env);
         let mut losers: Vec<Address> = Vec::new(&env);
-
+        let mut s_honest: Vec<Address> = Vec::new(&env);
+        let mut s_dishonest: Vec<Address> = Vec::new(&env);
         let mut honest: Vec<Address> = Vec::new(&env);
         let mut dishonest: Vec<Address> = Vec::new(&env);
 
         let mut amount_gained: i128 = 0;
         let mut amount_winner_pool: i128 = 0;
-
+        let game: Game = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Game(game_id.clone()))
+            .unwrap_or_else(|| panic!("No game found for this id"));
+        let privateBet: PrivateBet = env
+            .storage()
+            .persistent()
+            .get(&DataKey::SetPrivateBet(setting.clone()))
+            .unwrap_or(PrivateBet {
+                id: 0,
+                gameid: 0,
+                active: false,
+                description: String::from_slice(&env, "No private bet found"),
+                amount_bet_min: 0,
+                users_invated: Vec::new(&env),
+            });
         let assesments: ResultAssessment = env
             .storage()
             .persistent()
@@ -892,18 +1154,23 @@ impl Contract {
                 UsersApprove: Vec::new(&env),
                 UsersReject: Vec::new(&env),
             });
-        let mut privateBet: PrivateBet = env
-            .storage()
-            .persistent()
-            .get(&DataKey::SetPrivateBet(setting))
-            .unwrap_or(PrivateBet {
-                id: 0,
-                gameid: 0,
-                active: false,
-                description: String::from_slice(&env, "No private bet found"),
-                amount_bet_min: 0,
-                users_invated: Vec::new(&env),
-            });
+        if complain == 0 {
+            s_honest = assesments.CheckReject.clone();
+            s_dishonest = assesments.CheckApprove.clone();
+            s_dishonest.push_back(game.summiter.clone());
+        }
+        if complain == 1 {
+            // if the complain was incorrect
+            s_honest = assesments.CheckApprove.clone();
+            s_honest.push_back(game.summiter.clone());
+            s_dishonest = assesments.CheckReject.clone();
+        }
+        if complain == 2 {
+            // if the complain was not made
+            s_dishonest = assesments.CheckReject.clone();
+            s_honest = assesments.CheckApprove.clone();
+            s_honest.push_back(game.summiter.clone());
+        }
         for user in privateBet.users_invated.iter() {
             let bet: Bet = env
                 .storage()
@@ -921,9 +1188,20 @@ impl Contract {
                 continue;
             }
             if !assesments.UsersApprove.contains(&user) && !assesments.UsersReject.contains(&user) {
-                amount_gained += bet.amount_bet;
-                losers.push_back(user.clone());
-                continue;
+                if bet.bet == result.result {
+                    let amount_bet_withFine = (bet.amount_bet * 50) / 100;
+                    amount_winner_pool += amount_bet_withFine;
+                    env.storage()
+                        .persistent()
+                        .set(&DataKey::ClaimWinner(user.clone()), &amount_bet_withFine);
+                    //users lose some trust
+                    continue;
+                } else {
+                    losers.push_back(user.clone());
+                    amount_gained += bet.amount_bet;
+                    //user loses the trust coins too
+                    continue;
+                }
             }
             if complain == 0 {
                 if assesments.UsersApprove.contains(&user) {
@@ -931,11 +1209,19 @@ impl Contract {
                 } else {
                     honest.push_back(user.clone());
                 }
-            } else {
+            }
+            if complain == 1 {
                 if assesments.UsersReject.contains(&user) {
                     dishonest.push_back(user.clone());
                 } else {
                     honest.push_back(user.clone());
+                }
+            }
+            if complain == 2 {
+                if assesments.UsersApprove.contains(&user) {
+                    honest.push_back(user.clone());
+                } else {
+                    dishonest.push_back(user.clone());
                 }
             }
         }
@@ -958,7 +1244,7 @@ impl Contract {
                 continue;
             } else {
                 amount_gained += bet.amount_bet;
-                losers.push_back(user.clone());
+                // user lose trust
             }
         }
 
@@ -992,31 +1278,74 @@ impl Contract {
         let protocol_retribution = (amount_gained * 10) / 100;
         amount_gained -= summiter_retribution;
         amount_gained -= protocol_retribution;
-
-        for user in winners.iter() {
-            let bet: Bet = env
-                .storage()
-                .persistent()
-                .get(&DataKey::Bet(user.clone(), setting))
-                .unwrap_or(Bet {
-                    id: 0,
-                    gameid: 0,
-                    betType: BetType::Public,
-                    Setting: 0,
-                    bet: BetKey::Team_local,
-                    amount_bet: 0,
-                });
-
-            if bet.id == 0 {
-                continue;
-            } else {
-                let user_share = (bet.amount_bet * 100) / amount_winner_pool;
-                let user_amount = (user_share * amount_gained) / 100;
-                //send user_amount to user
-                env.storage()
+        let add = 20 * s_dishonest.len() as i128;
+        summiter_retribution += add;
+        if winners.len() == 0 {
+            for loser in losers.iter() {
+                let bet: Bet = env
+                    .storage()
                     .persistent()
-                    .set(&DataKey::ClaimWinner(user.clone()), &user_amount);
+                    .get(&DataKey::Bet(loser.clone(), setting))
+                    .unwrap_or(Bet {
+                        id: 0,
+                        gameid: 0,
+                        betType: BetType::Public,
+                        Setting: 0,
+                        bet: BetKey::Team_local,
+                        amount_bet: 0,
+                    });
+                if bet.id == 0 {
+                    continue;
+                } else {
+                    //send user amount to user
+                    let user_amount = (30 * bet.clone().amount_bet) / 100;
+                    let amount_pay = bet.clone().amount_bet - user_amount;
+                    env.storage()
+                        .persistent()
+                        .set(&DataKey::ClaimWinner(loser.clone()), &amount_pay);
+                }
             }
+        } else {
+            for user in winners.iter() {
+                let bet: Bet = env
+                    .storage()
+                    .persistent()
+                    .get(&DataKey::Bet(user.clone(), setting))
+                    .unwrap_or(Bet {
+                        id: 0,
+                        gameid: 0,
+                        betType: BetType::Public,
+                        Setting: 0,
+                        bet: BetKey::Team_local,
+                        amount_bet: 0,
+                    });
+
+                if bet.id == 0 {
+                    continue;
+                } else {
+                    let user_share = (bet.amount_bet * 100) / amount_winner_pool;
+                    let user_amount = (user_share * amount_gained) / 100;
+                    //send user_amount to user
+                    env.storage()
+                        .persistent()
+                        .set(&DataKey::ClaimWinner(user.clone()), &user_amount);
+                }
+            }
+        }
+
+        let mut each_summiter_share = 0;
+        if s_honest.len() > 0 {
+            each_summiter_share = summiter_retribution / s_honest.len() as i128;
+        }
+        let total_summiter = each_summiter_share + 20;
+        for s_user in s_honest.iter() {
+            env.storage()
+                .persistent()
+                .set(&DataKey::History_Summiter(s_user.clone()), &100);
+            let add = 20 * s_dishonest.len() as i128;
+            env.storage()
+                .persistent()
+                .set(&DataKey::ClaimSummiter(s_user.clone()), &total_summiter);
         }
     }
 }
