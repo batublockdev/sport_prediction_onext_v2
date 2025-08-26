@@ -2,7 +2,7 @@
 use core::{f32::consts::E, panic, result};
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, vec,
+    contract, contractimpl, contracttype, symbol_short, token, vec,
     xdr::{ScVal, ToXdr, WriteXdr},
     Address, Bytes, BytesN, Env, IntoVal, String, Symbol, Vec,
 };
@@ -88,6 +88,7 @@ pub enum DataKey {
     Result(i128),
     ClaimWinner(Address),
     ClaimSummiter(Address),
+    ClaimProtocol,
     ResultAssessment(i128),
     GameSummiters(i128),
     History_Summiter(Address),
@@ -118,6 +119,13 @@ pub enum BetType {
     Public,
     Private,
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[contracttype]
+pub enum ClaimType {
+    Summiter,
+    Protocol,
+    User,
+}
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Summiter {
@@ -125,12 +133,29 @@ struct Summiter {
     stakeAmount: i128,
     gameId: i128,
 }
+const ADMIN_KEY: Symbol = Symbol::short("ADMIN");
+const TOKEN_USD_KEY: Symbol = Symbol::short("TOKEN_USD");
+const TOKEN_TRUST_KEY: Symbol = Symbol::short("TK_TRUST");
 
 #[contract]
 pub struct Contract;
 
 #[contractimpl]
 impl Contract {
+    pub fn init(env: Env, admin: Address, token_usd: Address, token_trust: Address) {
+        admin.require_auth();
+
+        // check if already initialized
+        if env.storage().instance().has(&ADMIN_KEY) {
+            panic!("already initialized");
+        }
+
+        // save the admin
+        env.storage().instance().set(&ADMIN_KEY, &admin);
+        // save the token addresses
+        env.storage().instance().set(&TOKEN_USD_KEY, &token_usd);
+        env.storage().instance().set(&TOKEN_TRUST_KEY, &token_trust);
+    }
     pub fn request_result_summiter(
         env: Env,
         user: Address,
@@ -285,6 +310,12 @@ impl Contract {
     }
     pub fn bet(env: Env, user: Address, bet: Bet) {
         user.require_auth();
+        let contract_address = env.current_contract_address();
+        let usd = env
+            .storage()
+            .instance()
+            .get(&TOKEN_USD_KEY)
+            .unwrap_or_else(|| panic!("contract not initialized"));
         if bet.clone().amount_bet <= 0 {
             panic!("Bet amount must be greater than 0");
         }
@@ -329,6 +360,14 @@ impl Contract {
             if Self::CheckUser(env.clone(), user.clone(), privateBet.clone().gameid) {
                 panic!("You are not allowed to bet on this game");
             }
+            Self::moveToken(
+                &env,
+                &usd,
+                &user,
+                &contract_address,
+                &bet.clone().amount_bet,
+            );
+
             let mut listedBet: Vec<(i128)> = env
                 .storage()
                 .persistent()
@@ -421,6 +460,13 @@ impl Contract {
             if Self::CheckUser(env.clone(), user.clone(), publicBet.clone().gameid) {
                 panic!("You are not allowed to bet on this game");
             }
+            Self::moveToken(
+                &env,
+                &usd,
+                &user,
+                &contract_address,
+                &bet.clone().amount_bet,
+            );
             env.storage()
                 .persistent()
                 .set(&DataKey::Bet(user.clone(), bet.clone().Setting), &bet);
@@ -486,6 +532,63 @@ impl Contract {
             }
         }
     }
+    pub fn claim_money_noactive(env: Env, user: Address, setting: i128) {
+        user.require_auth();
+        let contract_address = env.current_contract_address();
+        let usd = env
+            .storage()
+            .instance()
+            .get(&TOKEN_USD_KEY)
+            .unwrap_or_else(|| panic!("contract not initialized"));
+        let betData: Bet = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Bet(user.clone(), setting))
+            .unwrap_or_else(|| panic!("No bet found for this user"));
+        if betData.betType == BetType::Private {
+            let privateBet: PrivateBet = env
+                .storage()
+                .persistent()
+                .get(&DataKey::SetPrivateBet(betData.clone().Setting))
+                .unwrap_or(PrivateBet {
+                    id: 0,
+                    gameid: 0,
+                    active: false,
+                    description: String::from_slice(&env, "No private bet found"),
+                    amount_bet_min: 0,
+                    users_invated: Vec::new(&env),
+                });
+            if privateBet.clone().id == 0 {
+                panic!("Private bet not found");
+            }
+            if !privateBet.clone().active {
+                Self::moveToken(&env, &usd, &contract_address, &user, &betData.amount_bet);
+            } else {
+                panic!("This private bet is still active");
+            }
+        } else if betData.betType == BetType::Public {
+            let publicBet: PublicBet = env
+                .storage()
+                .persistent()
+                .get(&DataKey::SetPublicBet(betData.clone().Setting))
+                .unwrap_or(PublicBet {
+                    id: 0,
+                    gameid: 0,
+                    active: false,
+                    description: String::from_slice(&env, "No public bet found"),
+                });
+            if publicBet.clone().id == 0 {
+                panic!("Public bet not found");
+            }
+            if !publicBet.clone().active {
+                Self::moveToken(&env, &usd, &contract_address, &user, &betData.amount_bet);
+            } else {
+                panic!("This public bet is still active");
+            }
+        } else {
+            panic!("Invalid bet type");
+        }
+    }
     //admin address
     pub fn set_game(env: Env, game: Game, signature: BytesN<64>, pub_key: BytesN<32>) {
         let (exist, startTime, endTime, summiter, checkers, _) =
@@ -509,7 +612,7 @@ impl Contract {
             .persistent()
             .set(&DataKey::SetPublicBet(game.id), &pubSetting);
     }
-    fn set_private_bet(env: Env, user: Address, privateData: PrivateBet, game: Game) {
+    pub fn set_private_bet(env: Env, user: Address, privateData: PrivateBet, game: Game) {
         user.require_auth();
 
         let (exist, startTime, endTime, summiter, checkers, _) =
@@ -923,29 +1026,61 @@ impl Contract {
         );
     }
 
-    pub fn claim(env: Env, user: Address, bet: Bet) -> i128 {
+    pub fn claim(env: Env, user: Address, typeClaim: ClaimType) -> i128 {
         user.require_auth();
+        let contract_address = env.current_contract_address();
+        let adminAdr: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic!("contract not initialized"));
+        let usd = env
+            .storage()
+            .instance()
+            .get(&TOKEN_USD_KEY)
+            .unwrap_or_else(|| panic!("contract not initialized"));
+        match typeClaim {
+            ClaimType::Summiter => {
+                let money: i128 = env
+                    .storage()
+                    .persistent()
+                    .get(&DataKey::ClaimSummiter(user.clone()))
+                    .unwrap_or(0);
+                Self::moveToken(&env, &usd, &contract_address, &user, &money);
+                env.storage()
+                    .persistent()
+                    .set(&DataKey::ClaimSummiter(user.clone()), &0);
 
-        let betData: Bet = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Bet(user.clone(), bet.clone().Setting))
-            .unwrap_or_else(|| panic!("No bet found for this user"));
-        let xresult: ResultGame = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Result(bet.clone().gameid))
-            .unwrap_or_else(|| panic!("No result found for this game"));
-        if xresult.pause == true {
-            panic!("Game result is paused, you cannot withdraw now");
+                return money;
+            }
+            ClaimType::Protocol => {
+                adminAdr.require_auth();
+                let money: i128 = env
+                    .storage()
+                    .persistent()
+                    .get(&DataKey::ClaimProtocol)
+                    .unwrap_or(0);
+                Self::moveToken(&env, &usd, &contract_address, &adminAdr, &money);
+                env.storage().persistent().set(&DataKey::ClaimProtocol, &0);
+                return money;
+            }
+            ClaimType::User => {
+                let money: i128 = env
+                    .storage()
+                    .persistent()
+                    .get(&DataKey::ClaimWinner(user.clone()))
+                    .unwrap_or(0);
+                Self::moveToken(&env, &usd, &contract_address, &user, &money);
+                env.storage()
+                    .persistent()
+                    .set(&DataKey::ClaimWinner(user.clone()), &0);
+                return money;
+            }
+            _ => {
+                // default case
+                panic!("Invalid claim type");
+            }
         }
-
-        let money: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::ClaimWinner(user.clone()))
-            .unwrap_or(0);
-        money
     }
     //set result by Supreme Court
     pub fn setResult_supremCourt(env: Env, user: Address, result: ResultGame) {
@@ -1203,7 +1338,12 @@ impl Contract {
                 }
             }
         }
-
+        let fine: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Fine(game_id.clone()))
+            .unwrap_or(0);
+        amount_gained += fine;
         summiter_retribution = (amount_gained * 20) / 100;
         protocol_retribution = (amount_gained * 10) / 100;
         amount_gained -= summiter_retribution;
@@ -1320,6 +1460,16 @@ impl Contract {
                 .persistent()
                 .set(&DataKey::ClaimSummiter(s_user.clone()), &total);
         }
+
+        let x_amountx: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::ClaimProtocol)
+            .unwrap_or(0);
+        let total = x_amountx + protocol_retribution;
+        env.storage()
+            .persistent()
+            .set(&DataKey::ClaimProtocol, &total);
     }
     fn distibution_private(
         env: Env,
@@ -1576,6 +1726,10 @@ impl Contract {
                 .persistent()
                 .set(&DataKey::ClaimSummiter(s_user.clone()), &total_summiter);
         }
+    }
+    fn moveToken(env: &Env, token: &Address, from: &Address, to: &Address, amount: &i128) {
+        let token = token::Client::new(env, token);
+        token.transfer(from, &to, amount);
     }
 }
 mod test;

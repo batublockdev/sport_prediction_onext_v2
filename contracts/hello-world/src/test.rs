@@ -17,9 +17,18 @@ use soroban_sdk::{
     xdr::WriteXdr,
     Bytes, BytesN, Env, IntoVal, InvokeError, TryIntoVal, Val,
 };
+use token::Client as TokenClient;
+use token::StellarAssetClient as TokenAdminClient;
 
 extern crate std;
 
+fn create_token_contract<'a>(e: &Env, admin: &Address) -> (TokenClient<'a>, TokenAdminClient<'a>) {
+    let sac = e.register_stellar_asset_contract_v2(admin.clone());
+    (
+        token::Client::new(e, &sac.address()),
+        token::StellarAssetClient::new(e, &sac.address()),
+    )
+}
 #[test]
 fn test_leaderboard_updates_correctly() {
     let env = Env::default();
@@ -40,13 +49,16 @@ fn test_leaderboard_updates_correctly() {
     let player = Address::generate(&env);
     let playerx = Address::generate(&env);
     let playerx2 = Address::generate(&env);
+    let token_admin = Address::generate(&env);
 
     env.mock_all_auths();
 
     // Deploy contract
     let contract_id = env.register_contract(None, Contract);
     let client = ContractClient::new(&env, &contract_id);
-
+    let (token_a, token_a_admin) = create_token_contract(&env, &token_admin);
+    let (token_b, token_b_admin) = create_token_contract(&env, &token_admin);
+    client.init(&token_admin, &token_a.address, &token_b.address);
     // User1 stake 100
     client.request_result_summiter(&user1, &100, &1);
     client.request_result_summiter(&user11, &100, &1);
@@ -118,15 +130,17 @@ fn test_leaderboard_updates_correctly() {
         bet: BetKey::Team_away,
         amount_bet: 1500,
     };
+    token_a_admin.mint(&player, &10000);
     client.bet(&player, &RD);
     let RD2 = Bet {
         id: 2,
         gameid: 1,
         betType: BetType::Public,
         Setting: 1,
-        bet: BetKey::Team_away,
+        bet: BetKey::Team_local,
         amount_bet: 2000,
     };
+    token_a_admin.mint(&playerx, &10000);
     client.bet(&playerx, &RD2);
     let RD3 = Bet {
         id: 3,
@@ -136,15 +150,17 @@ fn test_leaderboard_updates_correctly() {
         bet: BetKey::Draw,
         amount_bet: 3000,
     };
+    token_a_admin.mint(&user12, &10000);
     client.bet(&user12, &RD3);
     let RD4 = Bet {
         id: 4,
         gameid: 1,
         betType: BetType::Public,
         Setting: 1,
-        bet: BetKey::Team_away,
+        bet: BetKey::Team_local,
         amount_bet: 3000,
     };
+    token_a_admin.mint(&playerx2, &10000);
     //client.bet(&playerx2, &RD4);
     let results = ResultGame {
         id: 3,
@@ -170,12 +186,16 @@ fn test_leaderboard_updates_correctly() {
         pause: false,
     };
     client.execute_distribution(&1);
+    let dx = ClaimType::User;
     //client.setResult_supremCourt(&user1, &resultsx);
-    let earnPlayer = client.claim(&player, &RD);
+    let ee = client.claim(&player, &dx);
+    let earnPlayer = token_a.balance(&player);
     std::println!("Earned by Player: {:?}", earnPlayer);
-    let earnPlayerx = client.claim(&playerx, &RD2);
+    let y = client.claim(&playerx, &dx);
+    let earnPlayerx = token_a.balance(&playerx);
     std::println!("Earned by Playerx: {:?}", earnPlayerx);
-    let earnUser12 = client.claim(&user12, &RD3);
+    let z = client.claim(&user12, &dx);
+    let earnUser12 = token_a.balance(&user12);
     std::println!("Earned by User12: {:?}", earnUser12);
     //let earnPlayerx2 = client.claim(&playerx2, &RD4);
     //std::println!("Earned by Playerx2: {:?}", earnPlayerx2);
