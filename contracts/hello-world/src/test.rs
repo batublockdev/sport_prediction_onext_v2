@@ -130,7 +130,9 @@ fn test_leaderboard_updates_correctly() {
         bet: BetKey::Team_away,
         amount_bet: 1500,
     };
-    token_a_admin.mint(&player, &10000);
+    token_a_admin.mint(&player, &1500);
+    token_b_admin.mint(&player, &1500);
+
     client.bet(&player, &RD);
     let RD2 = Bet {
         id: 2,
@@ -140,7 +142,9 @@ fn test_leaderboard_updates_correctly() {
         bet: BetKey::Team_local,
         amount_bet: 2000,
     };
-    token_a_admin.mint(&playerx, &10000);
+    token_a_admin.mint(&playerx, &2000);
+    token_b_admin.mint(&playerx, &2000);
+
     client.bet(&playerx, &RD2);
     let RD3 = Bet {
         id: 3,
@@ -150,7 +154,9 @@ fn test_leaderboard_updates_correctly() {
         bet: BetKey::Draw,
         amount_bet: 3000,
     };
-    token_a_admin.mint(&user12, &10000);
+    token_a_admin.mint(&user12, &3000);
+    token_b_admin.mint(&user12, &3000);
+
     client.bet(&user12, &RD3);
     let RD4 = Bet {
         id: 4,

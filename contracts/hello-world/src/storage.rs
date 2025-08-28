@@ -142,193 +142,147 @@ pub struct Contract;
 
 #[contractimpl]
 impl Contract {
+    pub fn has_init(env: &Env) -> bool {
+        env.storage().instance().has(&ADMIN_KEY)
+    }
     pub fn init(env: Env, admin: Address, token_usd: Address, token_trust: Address) {
-        admin.require_auth();
-
-        // check if already initialized
-        if env.storage().instance().has(&ADMIN_KEY) {
-            panic!("already initialized");
-        }
-
         // save the admin
         env.storage().instance().set(&ADMIN_KEY, &admin);
         // save the token addresses
         env.storage().instance().set(&TOKEN_USD_KEY, &token_usd);
         env.storage().instance().set(&TOKEN_TRUST_KEY, &token_trust);
     }
-    pub fn request_result_summiter(
-        env: Env,
-        user: Address,
-        stakeAmount: i128,
-        gameId: i128,
-    ) -> bool {
-        user.require_auth();
-        if stakeAmount <= 0 {
-            panic!("Stake amount must be greater than 0");
-        }
-        if gameId <= 0 {
-            panic!("Invalid game ID");
-        }
-        /*We nee to set a amount to request for the summiter rol */
-        if stakeAmount == 20 {
-            panic!("Stake amount must be at least 10");
-        }
-        // ✅ Get history map (user → score history)
-        let history: i128 = env
-            .storage()
+    pub fn get_usd(env: Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&TOKEN_USD_KEY)
+            .unwrap_or_else(|| panic!("contract not initialized"))
+    }
+    pub fn get_trust(env: Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&TOKEN_TRUST_KEY)
+            .unwrap_or_else(|| panic!("contract not initialized"))
+    }
+    pub fn get_admin(env: Env) -> Address {
+        env.storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .unwrap_or_else(|| panic!("contract not initialized"))
+    }
+    pub fn get_history(env: Env, user: Address) -> i128 {
+        env.storage()
             .persistent()
             .get(&DataKey::History_Summiter(user.clone()))
-            .unwrap_or(10);
-
-        // ✅ Weighted score calculation
-        let new_score = (history * 70 + stakeAmount * 30) / 100;
-
-        // ✅ Leaderboard vector
-        let mut leaderboard: Vec<(Address, i128)> = env
-            .storage()
+            .unwrap_or(0)
+    }
+    pub fn get_leaderboard(env: Env, gameId: i128) -> Vec<(Address, i128)> {
+        env.storage()
             .persistent()
             .get(&DataKey::GameSummiters(gameId))
-            .unwrap_or(Vec::new(&env));
-
-        // Remove old entry for this user
-        let mut i = 0;
-        while i < leaderboard.len() {
-            let (addr, _) = leaderboard.get(i).unwrap();
-            if addr == user {
-                leaderboard.remove(i);
-                break;
-            }
-            i += 1;
-        }
-
-        // Find position to insert in descending order
-        let mut insert_index = leaderboard.len();
-        for idx in 0..leaderboard.len() {
-            let (_, score) = leaderboard.get(idx).unwrap();
-            if new_score > score || new_score == score {
-                insert_index = idx;
-                break;
-            }
-        }
-
-        // Insert at correct position
-        leaderboard.insert(insert_index, (user, new_score));
-
-        // Save leaderboard
+            .unwrap_or(Vec::new(&env))
+    }
+    pub fn set_leaderboard(env: Env, leaderboard: Vec<(Address, i128)>) -> bool {
         env.storage()
             .persistent()
             .set(&DataKey::GameSummiters(gameId), &leaderboard);
-        env.events()
-            .publish((COUNTER, symbol_short!("increment")), leaderboard);
-
         true
     }
-    fn select_summiter(env: Env, game_id: i128) {
-        let (exist, startTime, endTime, summiter, checkers, _) =
-            Self::existBet(env.clone(), game_id.clone());
-        if !exist {
-            panic!("Game haven't been set yet");
-        }
-        let leaderboard: Vec<(Address, i128)> = env
-            .storage()
+    pub fn update_game(env: Env, gameId: i128, summiter: Address, Active: bool) {
+        env.storage()
             .persistent()
-            .get(&DataKey::GameSummiters(game_id))
-            .unwrap_or(Vec::new(&env));
+            .update(&DataKey::Game(gameId), |maybe_game: Option<Game>| {
+                let mut game = maybe_game.unwrap_or(Game {
+                    id: gameId,
+                    active: true,
+                    league: 1,
+                    description: String::from_str(&env, ""),
+                    team_local: 0,
+                    team_away: 0,
+                    startTime: 0,
+                    endTime: 0,
+                    summiter: addr.clone(),
+                    Checker: Vec::new(&env),
+                });
+                game.summiter = addr.clone();
+                game.active = true;
+                game.Checker = checks.clone();
 
-        // Limit to top 5
-        let mut top = Vec::new(&env);
-        for i in 0..10 {
-            if let Some((addr, score)) = leaderboard.get(i) {
-                if score == 0 {
-                    break;
-                }
-                top.push_back((addr.clone(), score));
-            }
+                game
+            });
+    }
+    pub fn add_privateSettingList(env: Env, gameId: i128, setting: i128) {
+        {
+            let mut listedBet: Vec<(i128)> = env
+                .storage()
+                .persistent()
+                .get(&DataKey::PrivateBetList(bet.clone().gameid))
+                .unwrap_or(Vec::new(&env));
+            listedBet.push_back(setting);
+            env.storage()
+                .persistent()
+                .set(&DataKey::PrivateBetList(bet.clone().gameid), &listedBet);
         }
 
-        let sequence = env.ledger().sequence();
-        let timestamp = env.ledger().timestamp() as u32;
-        let mut rng = (sequence + timestamp) % (top.len() as u32);
-
-        let mut selected = Vec::new(&env);
-
-        for k in 0..5 {
-            let pick = rng % top.len();
-            let (addr, score) = top.get(pick).unwrap();
-            let mut checks: Vec<Address> = Vec::new(&env);
-            selected.push_back((addr.clone(), score));
-            if k == 0 {
-                env.storage().persistent().update(
-                    &DataKey::Game(game_id),
-                    |maybe_game: Option<Game>| {
-                        let mut game = maybe_game.unwrap_or(Game {
-                            id: game_id,
-                            active: true,
-                            league: 1,
-                            description: String::from_str(&env, ""),
-                            team_local: 0,
-                            team_away: 0,
-                            startTime: 0,
-                            endTime: 0,
-                            summiter: addr.clone(),
-                            Checker: Vec::new(&env),
-                        });
-                        game.summiter = addr.clone();
-                        game.active = true;
-                        game
+        pub fn add_bet(env: Env, user: Address, bet: Bet) {
+            env.storage()
+                .persistent()
+                .set(&DataKey::Bet(user.clone(), bet.clone().Setting), &bet);
+        }
+        pub fn does_bet_active(env: Env, setting: i128) -> bool {
+            let lastBet: LastB = env
+                .storage()
+                .persistent()
+                .get(&DataKey::lastBet(bet.clone().Setting))
+                .unwrap_or(LastB {
+                    id: 0,
+                    lastBet: BetKey::Team_local,
+                });
+            if lastBet.clone().id == 0 {
+                // it means this is the fisrt bet for this setting
+                env.storage().persistent().set(
+                    &DataKey::lastBet(bet.clone().Setting),
+                    &LastB {
+                        id: bet.clone().Setting,
+                        lastBet: bet.clone().bet,
                     },
                 );
+                return false;
             }
-            if k > 0 {
-                checks.push_back(addr.clone());
+            if lastBet.lastBet != bet.clone().bet {
+                return true;
             }
+        }
+        pub fn active_private_setting(env: Env, user: Address, setting: i128) {
             env.storage().persistent().update(
-                &DataKey::Game(game_id),
-                |maybe_game: Option<Game>| {
-                    let mut game = maybe_game.unwrap_or(Game {
-                        id: game_id,
-                        active: true,
-                        league: 1,
-                        description: String::from_str(&env, ""),
-                        team_local: 0,
-                        team_away: 0,
-                        startTime: 0,
-                        endTime: 0,
-                        summiter: addr.clone(),
-                        Checker: Vec::new(&env),
+                &DataKey::SetPrivateBet(setting),
+                |old: Option<PrivateBet>| {
+                    let mut res = old.unwrap_or(PrivateBet {
+                        id: privateBet.id,
+                        gameid: privateBet.gameid,
+                        active: false,
+                        description: privateBet.description.clone(),
+                        amount_bet_min: privateBet.amount_bet_min,
+                        users_invated: privateBet.users_invated.clone(),
                     });
-                    game.Checker = checks.clone();
-                    game
+                    res.active = true;
+                    res
                 },
             );
-
-            top.remove(pick); // remove picked
-            if top.len() == 0 {
-                break;
-            }
         }
-    }
-    pub fn bet(env: Env, user: Address, bet: Bet) {
-        user.require_auth();
-        let contract_address = env.current_contract_address();
-        let usd = env
-            .storage()
-            .instance()
-            .get(&TOKEN_USD_KEY)
-            .unwrap_or_else(|| panic!("contract not initialized"));
-        let trust: Address = env
-            .storage()
-            .instance()
-            .get(&TOKEN_TRUST_KEY)
-            .unwrap_or_else(|| panic!("contract not initialized"));
-        if bet.clone().amount_bet <= 0 {
-            panic!("Bet amount must be greater than 0");
+        pub fn get_PublicBet(env: Env, user: Address, setting: i128) -> PublicBet {
+            let publicBet: PublicBet = env
+                .storage()
+                .persistent()
+                .get(&DataKey::SetPublicBet(setting))
+                .unwrap_or(PublicBet {
+                    id: 0,
+                    gameid: 0,
+                    active: false,
+                    description: String::from_slice(&env, "No public bet found"),
+                });
         }
-        if bet.clone().id == 0 || bet.clone().Setting == 0 {
-            panic!("Invalid bet data");
-        }
-
-        if bet.clone().betType == BetType::Private {
+        pub fn get_PrivateBet(env: Env, user: Address, setting: i128) -> PrivateBet {
             let privateBet: PrivateBet = env
                 .storage()
                 .persistent()
@@ -341,274 +295,21 @@ impl Contract {
                     amount_bet_min: 0,
                     users_invated: Vec::new(&env),
                 });
-
-            if privateBet.clone().id == 0 {
-                panic!("Private bet not found");
-            }
-            if !privateBet.clone().users_invated.contains(&user) {
-                panic!("You are not invited to this private bet");
-            }
-            if bet.clone().amount_bet < privateBet.clone().amount_bet_min {
-                panic!("Bet amount is less than minimum required");
-            }
-            let (exist, startTime, endTime, _, _, active) =
-                Self::existBet(env.clone(), privateBet.clone().gameid);
-            if !exist {
-                panic!("Game haven't been set yet");
-            }
-            if startTime > env.ledger().timestamp() as u32 {
-                panic!("Game haven't started yet");
-            }
-            if endTime < env.ledger().timestamp() as u32 {
-                panic!("Game has already ended");
-            }
-            if Self::CheckUser(env.clone(), user.clone(), privateBet.clone().gameid) {
-                panic!("You are not allowed to bet on this game");
-            }
-
-            Self::moveToken(
-                &env,
-                &usd,
-                &user,
-                &contract_address,
-                &bet.clone().amount_bet,
-            );
-            Self::moveToken(
-                &env,
-                &trust,
-                &user,
-                &contract_address,
-                &((bet.clone().amount_bet * 30) / 100),
-            );
-
-            let mut listedBet: Vec<(i128)> = env
-                .storage()
-                .persistent()
-                .get(&DataKey::PrivateBetList(bet.clone().gameid))
-                .unwrap_or(Vec::new(&env));
-            listedBet.push_back(bet.clone().Setting);
-            env.storage()
-                .persistent()
-                .set(&DataKey::PrivateBetList(bet.clone().gameid), &listedBet);
-            env.storage()
-                .persistent()
-                .set(&DataKey::Bet(user.clone(), bet.clone().Setting), &bet);
-            if !privateBet.active {
-                let lastBet: LastB = env
+            pub fn add_listUsuers(env: Env, gameid: i128, user: Address) -> Vec<(Address)> {
+                let mut listedBetAddress: Vec<(Address)> = env
                     .storage()
                     .persistent()
-                    .get(&DataKey::lastBet(bet.clone().Setting))
-                    .unwrap_or(LastB {
-                        id: 0,
-                        lastBet: BetKey::Team_local,
-                    });
-                if lastBet.clone().id == 0 {
-                    // it means this is the fisrt bet for this setting
-                    env.storage().persistent().set(
-                        &DataKey::lastBet(bet.clone().Setting),
-                        &LastB {
-                            id: bet.clone().Setting,
-                            lastBet: bet.clone().bet,
-                        },
-                    );
-                } else {
-                    if lastBet.lastBet != bet.clone().bet {
-                        env.storage().persistent().update(
-                            &DataKey::SetPrivateBet(bet.clone().Setting),
-                            |old: Option<PrivateBet>| {
-                                let mut res = old.unwrap_or(PrivateBet {
-                                    id: privateBet.id,
-                                    gameid: privateBet.gameid,
-                                    active: false,
-                                    description: privateBet.description.clone(),
-                                    amount_bet_min: privateBet.amount_bet_min,
-                                    users_invated: privateBet.users_invated.clone(),
-                                });
-                                res.active = true;
-                                res
-                            },
-                        );
-                        env.storage().persistent().update(
-                            &DataKey::lastBet(bet.clone().Setting),
-                            |old: Option<LastB>| {
-                                let mut res = old.unwrap_or(LastB {
-                                    id: lastBet.id,
-                                    lastBet: BetKey::Team_local,
-                                });
-                                res.lastBet = bet.clone().bet;
-                                res
-                            },
-                        );
-                        if active == false {
-                            Self::select_summiter(env.clone(), privateBet.gameid)
-                        }
-                    }
-                }
-            }
-        } else if (bet.clone().betType == BetType::Public) {
-            let publicBet: PublicBet = env
-                .storage()
-                .persistent()
-                .get(&DataKey::SetPublicBet(bet.clone().Setting))
-                .unwrap_or(PublicBet {
-                    id: 0,
-                    gameid: 0,
-                    active: false,
-                    description: String::from_slice(&env, "No public bet found"),
-                });
-            if publicBet.clone().id == 0 {
-                panic!("Public bet not found");
-            }
-            let (exist, startTime, endTime, _, _, active) =
-                Self::existBet(env.clone(), publicBet.clone().gameid);
-            if !exist {
-                panic!("Game haven't been set yet");
-            }
-            if startTime > env.ledger().timestamp() as u32 {
-                panic!("Game haven't started yet");
-            }
-            if endTime < env.ledger().timestamp() as u32 {
-                panic!("Game has already ended");
-            }
-            if Self::CheckUser(env.clone(), user.clone(), publicBet.clone().gameid) {
-                panic!("You are not allowed to bet on this game");
-            }
-            Self::moveToken(
-                &env,
-                &usd,
-                &user,
-                &contract_address,
-                &bet.clone().amount_bet,
-            );
-            Self::moveToken(
-                &env,
-                &trust,
-                &user,
-                &contract_address,
-                &((bet.clone().amount_bet * 30) / 100),
-            );
-            env.storage()
-                .persistent()
-                .set(&DataKey::Bet(user.clone(), bet.clone().Setting), &bet);
-            let mut listedBetAddress: Vec<(Address)> = env
-                .storage()
-                .persistent()
-                .get(&DataKey::ListBetUser(bet.clone().gameid))
-                .unwrap_or(Vec::new(&env));
-            listedBetAddress.push_back(user.clone());
-            env.storage()
-                .persistent()
-                .set(&DataKey::ListBetUser(bet.clone().gameid), &listedBetAddress);
+                    .get(&DataKey::ListBetUser(gameid))
+                    .unwrap_or(Vec::new(&env));
 
-            if !publicBet.active {
-                let lastBet: LastB = env
-                    .storage()
+                listedBetAddress.push_back(user.clone());
+                env.storage()
                     .persistent()
-                    .get(&DataKey::lastBet(bet.clone().Setting))
-                    .unwrap_or(LastB {
-                        id: 0,
-                        lastBet: BetKey::Team_local,
-                    });
-                if lastBet.clone().id == 0 {
-                    // it means this is the fisrt bet for this setting
-                    env.storage().persistent().set(
-                        &DataKey::lastBet(bet.clone().Setting),
-                        &LastB {
-                            id: bet.clone().Setting,
-                            lastBet: bet.clone().bet,
-                        },
-                    );
-                } else {
-                    if lastBet.lastBet != bet.clone().bet {
-                        env.storage().persistent().update(
-                            &DataKey::SetPublicBet(bet.clone().Setting),
-                            |old: Option<PublicBet>| {
-                                let mut res = old.unwrap_or(PublicBet {
-                                    id: publicBet.id,
-                                    gameid: publicBet.gameid,
-                                    active: false,
-                                    description: publicBet.description.clone(),
-                                });
-                                res.active = true;
-                                res
-                            },
-                        );
-                        env.storage().persistent().update(
-                            &DataKey::lastBet(bet.clone().Setting),
-                            |old: Option<LastB>| {
-                                let mut res = old.unwrap_or(LastB {
-                                    id: lastBet.id,
-                                    lastBet: BetKey::Team_local,
-                                });
-                                res.lastBet = bet.clone().bet;
-                                res
-                            },
-                        );
-                        if active == false {
-                            Self::select_summiter(env.clone(), publicBet.gameid)
-                        }
-                    }
-                }
+                    .set(&DataKey::ListBetUser(gameid), &listedBetAddress);
             }
-        }
-    }
-    pub fn claim_money_noactive(env: Env, user: Address, setting: i128) {
-        user.require_auth();
-        let contract_address = env.current_contract_address();
-        let usd = env
-            .storage()
-            .instance()
-            .get(&TOKEN_USD_KEY)
-            .unwrap_or_else(|| panic!("contract not initialized"));
-        let betData: Bet = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Bet(user.clone(), setting))
-            .unwrap_or_else(|| panic!("No bet found for this user"));
-        if betData.betType == BetType::Private {
-            let privateBet: PrivateBet = env
-                .storage()
-                .persistent()
-                .get(&DataKey::SetPrivateBet(betData.clone().Setting))
-                .unwrap_or(PrivateBet {
-                    id: 0,
-                    gameid: 0,
-                    active: false,
-                    description: String::from_slice(&env, "No private bet found"),
-                    amount_bet_min: 0,
-                    users_invated: Vec::new(&env),
-                });
-            if privateBet.clone().id == 0 {
-                panic!("Private bet not found");
-            }
-            if !privateBet.clone().active {
-                Self::moveToken(&env, &usd, &contract_address, &user, &betData.amount_bet);
-            } else {
-                panic!("This private bet is still active");
-            }
-        } else if betData.betType == BetType::Public {
-            let publicBet: PublicBet = env
-                .storage()
-                .persistent()
-                .get(&DataKey::SetPublicBet(betData.clone().Setting))
-                .unwrap_or(PublicBet {
-                    id: 0,
-                    gameid: 0,
-                    active: false,
-                    description: String::from_slice(&env, "No public bet found"),
-                });
-            if publicBet.clone().id == 0 {
-                panic!("Public bet not found");
-            }
-            if !publicBet.clone().active {
-                Self::moveToken(&env, &usd, &contract_address, &user, &betData.amount_bet);
-            } else {
-                panic!("This public bet is still active");
-            }
-        } else {
-            panic!("Invalid bet type");
-        }
-    }
+
+
+
     //admin address
     pub fn set_game(env: Env, game: Game, signature: BytesN<64>, pub_key: BytesN<32>) {
         let (exist, startTime, endTime, summiter, checkers, _) =
