@@ -9,71 +9,71 @@ use soroban_sdk::{
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct Game {
-    id: i128,
-    active: bool,
-    league: i128,
-    description: String,
-    team_local: i128,
-    team_away: i128,
-    startTime: u32,
-    endTime: u32,
-    summiter: Address,
-    Checker: Vec<Address>,
+pub struct Game {
+    pub id: i128,
+    pub active: bool,
+    pub league: i128,
+    pub description: String,
+    pub team_local: i128,
+    pub team_away: i128,
+    pub startTime: u32,
+    pub endTime: u32,
+    pub summiter: Address,
+    pub Checker: Vec<Address>,
 }
 
 #[contracttype]
 #[derive(Clone)]
-struct ResultGame {
-    id: i128,
-    gameid: i128,
-    description: String,
-    result: BetKey,
-    pause: bool,
+pub struct ResultGame {
+    pub id: i128,
+    pub gameid: i128,
+    pub description: String,
+    pub result: BetKey,
+    pub pause: bool,
 }
 #[contracttype]
 #[derive(Clone)]
-struct ResultAssessment {
-    id: i128,
-    gameid: i128,
-    CheckApprove: Vec<Address>,
-    CheckReject: Vec<Address>,
-    UsersApprove: Vec<Address>,
-    UsersReject: Vec<Address>,
+pub struct ResultAssessment {
+    pub id: i128,
+    pub gameid: i128,
+    pub CheckApprove: Vec<Address>,
+    pub CheckReject: Vec<Address>,
+    pub UsersApprove: Vec<Address>,
+    pub UsersReject: Vec<Address>,
 }
 #[contracttype]
 #[derive(Clone)]
-struct PrivateBet {
-    id: i128,
-    gameid: i128,
-    active: bool,
-    description: String,
-    amount_bet_min: i128,
-    users_invated: Vec<Address>,
+pub struct PrivateBet {
+    pub id: i128,
+    pub gameid: i128,
+    pub active: bool,
+    pub description: String,
+    pub amount_bet_min: i128,
+    pub users_invated: Vec<Address>,
 }
 #[contracttype]
 #[derive(Clone)]
-struct LastB {
-    id: i128,
-    lastBet: BetKey,
+pub struct LastB {
+    pub id: i128,
+    pub lastBet: BetKey,
 }
 #[contracttype]
 #[derive(Clone)]
-struct PublicBet {
-    id: i128,
-    gameid: i128,
-    active: bool,
-    description: String,
+pub struct PublicBet {
+    pub id: i128,
+    pub gameid: i128,
+    pub active: bool,
+    pub description: String,
 }
 #[contracttype]
 #[derive(Clone)]
-struct Bet {
-    id: i128,
-    gameid: i128,
-    betType: BetType,
-    Setting: i128,
-    bet: BetKey,
-    amount_bet: i128,
+pub struct Bet {
+    pub id: i128,
+    pub gameid: i128,
+    pub betType: BetType,
+    pub Setting: i128,
+    pub bet: BetKey,
+    pub amount_bet: i128,
 }
 
 #[derive(Clone)]
@@ -128,14 +128,3 @@ struct Summiter {
     stakeAmount: i128,
     gameId: i128,
 }
-const ADMIN_KEY: Symbol = Symbol::short("ADMIN");
-const TOKEN_USD_KEY: Symbol = Symbol::short("TOKEN_USD");
-const TOKEN_TRUST_KEY: Symbol = Symbol::short("TK_TRUST");
-const LEADERBOARD: Symbol = symbol_short!("LB");
-const SUMITTERS_HISTORY: Symbol = symbol_short!("H_S");
-const COUNTER: Symbol = symbol_short!("COUNTER");
-const x: Symbol = symbol_short!("x");
-const DUMMYUSSER: Address = Address::from_string(&String::from_str(
-    &env,
-    "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-));
