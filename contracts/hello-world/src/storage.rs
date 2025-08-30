@@ -74,13 +74,7 @@ pub fn set_leaderboard(env: Env, gameId: i128, leaderboard: Vec<(Address, i128)>
         .set(&DataKey::GameSummiters(gameId), &leaderboard);
     true
 }
-pub fn update_game(
-    env: Env,
-    gameId: i128,
-    summiter: Address,
-    Active: bool,
-    checkers: Vec<(Address)>,
-) {
+pub fn update_game(env: Env, gameId: i128, summiter: Address, checkers: Vec<(Address)>) {
     env.storage()
         .persistent()
         .update(&DataKey::Game(gameId), |maybe_game: Option<Game>| {
@@ -184,7 +178,7 @@ pub fn get_PublicBet(env: Env, user: Address, setting: i128) -> PublicBet {
         });
     publicBet
 }
-pub fn get_PrivateBet(env: Env, user: Address, setting: i128) -> PrivateBet {
+pub fn get_PrivateBet(env: Env, setting: i128) -> PrivateBet {
     env.storage()
         .persistent()
         .get(&DataKey::SetPrivateBet(setting))
@@ -409,4 +403,69 @@ pub fn set_ResultAssessment(env: Env, gameid: i128, data: ResultAssessment) {
     env.storage()
         .persistent()
         .set(&DataKey::ResultAssessment(gameid), &data);
+}
+pub fn CheckUser(env: Env, user: Address, game_id: i128) -> bool {
+    let mut check: bool = false;
+    let receiveGame = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Game(game_id))
+        .unwrap_or(Game {
+            id: 0,
+            active: false,
+            league: 0,
+            description: String::from_slice(&env, "No game found"),
+            team_local: 0,
+            team_away: 0,
+            startTime: 0,
+            endTime: 0,
+            summiter: Address::from_string(&String::from_str(
+                &env,
+                "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+            )),
+            Checker: Vec::new(&env),
+        });
+
+    if receiveGame.summiter != user && !receiveGame.Checker.contains(&user) {
+        check = false;
+    } else {
+        check = true;
+    }
+    check
+}
+pub fn existBet(env: Env, game_id: i128) -> (bool, u32, u32, Address, Vec<Address>, bool) {
+    let mut check: bool = false;
+    let receiveGame = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Game(game_id))
+        .unwrap_or(Game {
+            id: 0,
+            active: false,
+            league: 0,
+            description: String::from_slice(&env, "No game found"),
+            team_local: 0,
+            team_away: 0,
+            startTime: 0,
+            endTime: 0,
+            summiter: Address::from_string(&String::from_str(
+                &env,
+                "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+            )),
+            Checker: Vec::new(&env),
+        });
+
+    if receiveGame.id == 0 {
+        check = false;
+    } else {
+        check = true;
+    }
+    (
+        check,
+        receiveGame.startTime,
+        receiveGame.endTime,
+        receiveGame.summiter,
+        receiveGame.Checker,
+        receiveGame.active,
+    )
 }

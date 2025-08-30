@@ -1,194 +1,54 @@
 #![no_std]
 use core::{f32::consts::E, panic, result};
 
+use crate::{
+    bettingTrait::betting,
+    errors::BettingError,
+    storage,
+    types::{
+        AssessmentKey, Bet, BetKey, BetType, ClaimType, DataKey, Game, LastB, PrivateBet,
+        PublicBet, ResultAssessment, ResultGame,
+    },
+};
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, token, vec,
+    contract, contractimpl, panic_with_error, symbol_short, token, vec,
     xdr::{ScVal, ToXdr, WriteXdr},
     Address, Bytes, BytesN, Env, IntoVal, String, Symbol, Vec,
 };
 
-const LEADERBOARD: Symbol = symbol_short!("LB");
-const SUMITTERS_HISTORY: Symbol = symbol_short!("H_S");
-const COUNTER: Symbol = symbol_short!("COUNTER");
-const x: Symbol = symbol_short!("x");
-
-#[contracttype]
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Game {
-    id: i128,
-    active: bool,
-    league: i128,
-    description: String,
-    team_local: i128,
-    team_away: i128,
-    startTime: u32,
-    endTime: u32,
-    summiter: Address,
-    Checker: Vec<Address>,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct ResultGame {
-    id: i128,
-    gameid: i128,
-    description: String,
-    result: BetKey,
-    pause: bool,
-}
-#[contracttype]
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct ResultAssessment {
-    id: i128,
-    gameid: i128,
-    CheckApprove: Vec<Address>,
-    CheckReject: Vec<Address>,
-    UsersApprove: Vec<Address>,
-    UsersReject: Vec<Address>,
-}
-#[contracttype]
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct PrivateBet {
-    id: i128,
-    gameid: i128,
-    active: bool,
-    description: String,
-    amount_bet_min: i128,
-    users_invated: Vec<Address>,
-}
-#[contracttype]
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct LastB {
-    id: i128,
-    lastBet: BetKey,
-}
-#[contracttype]
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct PublicBet {
-    id: i128,
-    gameid: i128,
-    active: bool,
-    description: String,
-}
-#[contracttype]
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Bet {
-    id: i128,
-    gameid: i128,
-    betType: BetType,
-    Setting: i128,
-    bet: BetKey,
-    amount_bet: i128,
-}
-
-#[derive(Clone)]
-#[contracttype]
-pub enum DataKey {
-    Game(i128),
-    Result(i128),
-    ClaimWinner(Address),
-    ClaimSummiter(Address),
-    ClaimProtocol,
-    ResultAssessment(i128),
-    GameSummiters(i128),
-    History_Summiter(Address),
-    SetPrivateBet(i128),
-    SetPublicBet(i128),
-    Bet(Address, i128),
-    PrivateBetList(i128),
-    lastBet(i128),
-    Fine(i128),
-    ListBetUser(i128),
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[contracttype]
-pub enum BetKey {
-    Team_local,
-    Team_away,
-    Draw,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[contracttype]
-pub enum AssessmentKey {
-    approve,
-    reject,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[contracttype]
-pub enum BetType {
-    Public,
-    Private,
-}
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[contracttype]
-pub enum ClaimType {
-    Summiter,
-    Protocol,
-    User,
-}
-#[contracttype]
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Summiter {
-    user: Address,
-    stakeAmount: i128,
-    gameId: i128,
-}
-const ADMIN_KEY: Symbol = Symbol::short("ADMIN");
-const TOKEN_USD_KEY: Symbol = Symbol::short("TOKEN_USD");
-const TOKEN_TRUST_KEY: Symbol = Symbol::short("TK_TRUST");
-
 #[contract]
-pub struct Contract;
+pub struct BettingContract;
 
 #[contractimpl]
-impl Contract {
-    pub fn init(env: Env, admin: Address, token_usd: Address, token_trust: Address) {
+impl betting for BettingContract {
+    fn init(env: Env, admin: Address, token_usd: Address, token_trust: Address) {
         admin.require_auth();
 
         // check if already initialized
-        if env.storage().instance().has(&ADMIN_KEY) {
-            panic!("already initialized");
+        if storage::has_init(&env) {
+            panic_with_error!(&env, BettingError::AlreadyInitializedError);
         }
-
-        // save the admin
-        env.storage().instance().set(&ADMIN_KEY, &admin);
-        // save the token addresses
-        env.storage().instance().set(&TOKEN_USD_KEY, &token_usd);
-        env.storage().instance().set(&TOKEN_TRUST_KEY, &token_trust);
+        // Save data
+        storage::init(env, admin, token_usd, token_trust);
     }
-    pub fn request_result_summiter(
-        env: Env,
-        user: Address,
-        stakeAmount: i128,
-        gameId: i128,
-    ) -> bool {
+    fn request_result_summiter(env: Env, user: Address, stakeAmount: i128, gameId: i128) -> bool {
         user.require_auth();
         if stakeAmount <= 0 {
-            panic!("Stake amount must be greater than 0");
+            panic_with_error!(&env, BettingError::NegativeAmountError);
         }
         if gameId <= 0 {
-            panic!("Invalid game ID");
+            panic_with_error!(&env, BettingError::InvalidInputError);
         }
         /*We nee to set a amount to request for the summiter rol */
-        if stakeAmount == 20 {
-            panic!("Stake amount must be at least 10");
-        }
         // ✅ Get history map (user → score history)
-        let history: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::History_Summiter(user.clone()))
-            .unwrap_or(10);
+        let history: i128 = storage::get_history(env.clone(), user.clone());
 
         // ✅ Weighted score calculation
         let new_score = (history * 70 + stakeAmount * 30) / 100;
 
         // ✅ Leaderboard vector
-        let mut leaderboard: Vec<(Address, i128)> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::GameSummiters(gameId))
-            .unwrap_or(Vec::new(&env));
+        let mut leaderboard: Vec<(Address, i128)> =
+            storage::get_leaderboard(env.clone(), gameId.clone());
 
         // Remove old entry for this user
         let mut i = 0;
@@ -215,25 +75,18 @@ impl Contract {
         leaderboard.insert(insert_index, (user, new_score));
 
         // Save leaderboard
-        env.storage()
-            .persistent()
-            .set(&DataKey::GameSummiters(gameId), &leaderboard);
-        env.events()
-            .publish((COUNTER, symbol_short!("increment")), leaderboard);
+        storage::set_leaderboard(env.clone(), gameId, leaderboard);
 
         true
     }
     fn select_summiter(env: Env, game_id: i128) {
         let (exist, startTime, endTime, summiter, checkers, _) =
-            Self::existBet(env.clone(), game_id.clone());
+            storage::existBet(env.clone(), game_id.clone());
         if !exist {
-            panic!("Game haven't been set yet");
+            panic_with_error!(&env, BettingError::GameDoesNotExist);
         }
-        let leaderboard: Vec<(Address, i128)> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::GameSummiters(game_id))
-            .unwrap_or(Vec::new(&env));
+        let leaderboard: Vec<(Address, i128)> =
+            storage::get_leaderboard(env.clone(), game_id.clone());
 
         // Limit to top 5
         let mut top = Vec::new(&env);
@@ -249,78 +102,37 @@ impl Contract {
         let sequence = env.ledger().sequence();
         let timestamp = env.ledger().timestamp() as u32;
         let mut rng = (sequence + timestamp) % (top.len() as u32);
-
         let mut selected = Vec::new(&env);
-
+        let mut selected_Summitters: Vec<Address> = Vec::new(&env);
         for k in 0..5 {
             let pick = rng % top.len();
             let (addr, score) = top.get(pick).unwrap();
             let mut checks: Vec<Address> = Vec::new(&env);
             selected.push_back((addr.clone(), score));
             if k == 0 {
-                env.storage().persistent().update(
-                    &DataKey::Game(game_id),
-                    |maybe_game: Option<Game>| {
-                        let mut game = maybe_game.unwrap_or(Game {
-                            id: game_id,
-                            active: true,
-                            league: 1,
-                            description: String::from_str(&env, ""),
-                            team_local: 0,
-                            team_away: 0,
-                            startTime: 0,
-                            endTime: 0,
-                            summiter: addr.clone(),
-                            Checker: Vec::new(&env),
-                        });
-                        game.summiter = addr.clone();
-                        game.active = true;
-                        game
-                    },
-                );
+                selected_Summitters.push_back(addr.clone());
             }
             if k > 0 {
-                checks.push_back(addr.clone());
+                selected_Summitters.push_back(addr.clone());
             }
-            env.storage().persistent().update(
-                &DataKey::Game(game_id),
-                |maybe_game: Option<Game>| {
-                    let mut game = maybe_game.unwrap_or(Game {
-                        id: game_id,
-                        active: true,
-                        league: 1,
-                        description: String::from_str(&env, ""),
-                        team_local: 0,
-                        team_away: 0,
-                        startTime: 0,
-                        endTime: 0,
-                        summiter: addr.clone(),
-                        Checker: Vec::new(&env),
-                    });
-                    game.Checker = checks.clone();
-                    game
-                },
-            );
 
             top.remove(pick); // remove picked
             if top.len() == 0 {
                 break;
             }
         }
+        storage::update_game(
+            env.clone(),
+            game_id,
+            selected_Summitters.get(0).unwrap().clone(),
+            selected_Summitters,
+        );
     }
-    pub fn bet(env: Env, user: Address, bet: Bet) {
+    fn bet(env: Env, user: Address, bet: Bet) {
         user.require_auth();
         let contract_address = env.current_contract_address();
-        let usd = env
-            .storage()
-            .instance()
-            .get(&TOKEN_USD_KEY)
-            .unwrap_or_else(|| panic!("contract not initialized"));
-        let trust: Address = env
-            .storage()
-            .instance()
-            .get(&TOKEN_TRUST_KEY)
-            .unwrap_or_else(|| panic!("contract not initialized"));
+        let usd = storage::get_usd(env.clone());
+        let trust: Address = storage::get_trust(env.clone());
         if bet.clone().amount_bet <= 0 {
             panic!("Bet amount must be greater than 0");
         }
@@ -329,18 +141,7 @@ impl Contract {
         }
 
         if bet.clone().betType == BetType::Private {
-            let privateBet: PrivateBet = env
-                .storage()
-                .persistent()
-                .get(&DataKey::SetPrivateBet(bet.clone().Setting))
-                .unwrap_or(PrivateBet {
-                    id: 0,
-                    gameid: 0,
-                    active: false,
-                    description: String::from_slice(&env, "No private bet found"),
-                    amount_bet_min: 0,
-                    users_invated: Vec::new(&env),
-                });
+            let privateBet: PrivateBet = storge::get_PrivateBet(env.clone(), bet.clone().Setting);
 
             if privateBet.clone().id == 0 {
                 panic!("Private bet not found");
@@ -647,71 +448,7 @@ impl Contract {
             .persistent()
             .set(&DataKey::SetPrivateBet(privateData.id), &privateData);
     }
-    fn CheckUser(env: Env, user: Address, game_id: i128) -> bool {
-        let mut check: bool = false;
-        let receiveGame = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Game(game_id))
-            .unwrap_or(Game {
-                id: 0,
-                active: false,
-                league: 0,
-                description: String::from_slice(&env, "No game found"),
-                team_local: 0,
-                team_away: 0,
-                startTime: 0,
-                endTime: 0,
-                summiter: Address::from_string(&String::from_str(
-                    &env,
-                    "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-                )),
-                Checker: Vec::new(&env),
-            });
 
-        if receiveGame.summiter != user && !receiveGame.Checker.contains(&user) {
-            check = false;
-        } else {
-            check = true;
-        }
-        check
-    }
-    fn existBet(env: Env, game_id: i128) -> (bool, u32, u32, Address, Vec<Address>, bool) {
-        let mut check: bool = false;
-        let receiveGame = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Game(game_id))
-            .unwrap_or(Game {
-                id: 0,
-                active: false,
-                league: 0,
-                description: String::from_slice(&env, "No game found"),
-                team_local: 0,
-                team_away: 0,
-                startTime: 0,
-                endTime: 0,
-                summiter: Address::from_string(&String::from_str(
-                    &env,
-                    "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
-                )),
-                Checker: Vec::new(&env),
-            });
-
-        if receiveGame.id == 0 {
-            check = false;
-        } else {
-            check = true;
-        }
-        (
-            check,
-            receiveGame.startTime,
-            receiveGame.endTime,
-            receiveGame.summiter,
-            receiveGame.Checker,
-            receiveGame.active,
-        )
-    }
     pub fn summitResult(env: Env, user: Address, result: ResultGame) -> ResultGame {
         user.require_auth();
         let (exist, startTime, endTime, summiter, checkers, active) =

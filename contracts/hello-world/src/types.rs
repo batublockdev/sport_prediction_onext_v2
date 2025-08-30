@@ -108,13 +108,13 @@ pub enum AssessmentKey {
     approve,
     reject,
 }
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 #[contracttype]
 pub enum BetType {
     Public,
     Private,
 }
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 #[contracttype]
 pub enum ClaimType {
     Summiter,
