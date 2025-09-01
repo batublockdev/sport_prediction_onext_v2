@@ -8,7 +8,6 @@ use crate::types::{AssessmentKey, Bet, BetKey, ClaimType, Game, PrivateBet, Resu
 pub trait betting {
     fn init(env: Env, admin: Address, token_usd: Address, token_trust: Address);
     fn request_result_summiter(env: Env, user: Address, stakeAmount: i128, gameId: i128) -> bool;
-    fn select_summiter(env: Env, game_id: i128);
     fn bet(env: Env, user: Address, bet: Bet);
     fn claim_money_noactive(env: Env, user: Address, setting: i128);
     fn set_game(env: Env, game: Game, signature: BytesN<64>, pub_key: BytesN<32>);

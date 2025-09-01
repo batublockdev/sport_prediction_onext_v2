@@ -122,6 +122,14 @@ pub fn add_bet(env: Env, user: Address, bet: Bet) {
         .persistent()
         .set(&DataKey::Bet(user.clone(), bet.clone().Setting), &bet);
 }
+pub fn get_bet(env: Env, user: Address, setting: i128) -> Bet {
+    let bet: Bet = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Bet(user.clone(), setting))
+        .unwrap_or_else(|| panic!("No bet found for this user"));
+    bet
+}
 pub fn does_bet_active(env: Env, bet: Bet) -> bool {
     let lastBet: LastB = env
         .storage()
@@ -165,7 +173,22 @@ pub fn active_private_setting(env: Env, user: Address, setting: i128) {
         },
     );
 }
-pub fn get_PublicBet(env: Env, user: Address, setting: i128) -> PublicBet {
+pub fn active_public_setting(env: Env, setting: i128) {
+    env.storage().persistent().update(
+        &DataKey::SetPublicBet(bet.clone().Setting),
+        |old: Option<PublicBet>| {
+            let mut res = old.unwrap_or(PublicBet {
+                id: publicBet.id,
+                gameid: publicBet.gameid,
+                active: false,
+                description: publicBet.description.clone(),
+            });
+            res.active = true;
+            res
+        },
+    );
+}
+pub fn get_PublicBet(env: Env, setting: i128) -> PublicBet {
     let publicBet: PublicBet = env
         .storage()
         .persistent()
@@ -242,13 +265,13 @@ pub fn get_game(env: Env, game_id: i128) -> Game {
         });
     game
 }
-pub fn add_Fine(env: Env, gameid: i128, fine: i128) {
+pub fn add_Fine(env: Env, gameid: i128, finex: i128) {
     let fines: i128 = env
         .storage()
         .persistent()
         .get(&DataKey::Fine(gameid))
         .unwrap_or(0);
-    let total_fine = fines + fine;
+    let total_fine = fines + finex;
     env.storage()
         .persistent()
         .set(&DataKey::Fine(gameid), &total_fine);
@@ -261,7 +284,7 @@ pub fn get_Fine(env: Env, gameid: i128) -> i128 {
         .unwrap_or(0);
     fine
 }
-pub fn set_ResultGame(env: Env, user: Address, result: ResultGame) {
+pub fn set_ResultGame(env: Env, result: ResultGame) {
     env.storage()
         .persistent()
         .set(&DataKey::Result(result.clone().gameid), &result);
