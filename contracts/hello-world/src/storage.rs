@@ -174,19 +174,18 @@ pub fn active_private_setting(env: Env, user: Address, setting: i128) {
     );
 }
 pub fn active_public_setting(env: Env, setting: i128) {
-    env.storage().persistent().update(
-        &DataKey::SetPublicBet(bet.clone().Setting),
-        |old: Option<PublicBet>| {
+    env.storage()
+        .persistent()
+        .update(&DataKey::SetPublicBet(setting), |old: Option<PublicBet>| {
             let mut res = old.unwrap_or(PublicBet {
-                id: publicBet.id,
-                gameid: publicBet.gameid,
+                id: 0,
+                gameid: 0,
                 active: false,
-                description: publicBet.description.clone(),
+                description: String::from_slice(&env, "No public bet found"),
             });
             res.active = true;
             res
-        },
-    );
+        });
 }
 pub fn get_PublicBet(env: Env, setting: i128) -> PublicBet {
     let publicBet: PublicBet = env

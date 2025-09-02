@@ -30,4 +30,7 @@ pub enum BettingError {
     GameHasNotFinished = 211,
     NotAllowToSummitResult = 212,
     GameAssesmentHasFinished = 213,
+    GameResultNotFound = 214,
+    UserCannotVote = 215,
+    GameHasNotBeenPaused = 216,
 }

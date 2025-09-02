@@ -102,7 +102,7 @@ pub enum BetKey {
     Team_away,
     Draw,
 }
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 #[contracttype]
 pub enum AssessmentKey {
     approve,
