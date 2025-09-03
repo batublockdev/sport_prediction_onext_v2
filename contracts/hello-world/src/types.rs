@@ -94,6 +94,11 @@ pub enum DataKey {
     lastBet(i128),
     Fine(i128),
     ListBetUser(i128),
+    NotAssesedYet(i128, BetKey),
+    Rejected(i128, BetKey),
+    Approved(i128, BetKey),
+    pool(i128),
+    poolSummiter(i128),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[contracttype]

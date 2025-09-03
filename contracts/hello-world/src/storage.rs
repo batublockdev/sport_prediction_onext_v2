@@ -108,7 +108,8 @@ pub fn add_privateSettingList(env: Env, gameId: i128, setting: i128) {
         .persistent()
         .set(&DataKey::PrivateBetList(gameId), &listedBet);
 }
-pub fn get_privateSettingList(env: Env, gameId: i128, setting: i128) -> Vec<(i128)> {
+
+pub fn get_privateSettingList(env: Env, gameId: i128) -> Vec<(i128)> {
     let list: Vec<(i128)> = env
         .storage()
         .persistent()
@@ -490,4 +491,105 @@ pub fn existBet(env: Env, game_id: i128) -> (bool, u32, u32, Address, Vec<Addres
         receiveGame.Checker,
         receiveGame.active,
     )
+}
+pub fn add_not_assesed_yet(env: Env, game_id: i128, Amount: i128, bet: BetKey) {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::NotAssesedYet(game_id, bet.clone()))
+        .unwrap_or(0);
+    let Amountx = total_amount + Amount;
+    env.storage()
+        .persistent()
+        .set(&DataKey::NotAssesedYet(game_id, bet.clone()), &Amountx);
+}
+pub fn delete_not_assesed_yet(env: Env, game_id: i128, Amount: i128, bet: BetKey) {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::NotAssesedYet(game_id, bet.clone()))
+        .unwrap_or(0);
+    let Amountx = total_amount - Amount;
+    env.storage()
+        .persistent()
+        .set(&DataKey::NotAssesedYet(game_id, bet.clone()), &Amountx);
+}
+pub fn get_not_assesed_yet(env: Env, game_id: i128, bet: BetKey) -> i128 {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::NotAssesedYet(game_id, bet.clone()))
+        .unwrap_or(0);
+    total_amount
+}
+pub fn add_approve_total(env: Env, game_id: i128, Amount: i128, bet: BetKey) {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Approved(game_id, bet.clone()))
+        .unwrap_or(0);
+    let Amountx = total_amount + Amount;
+    env.storage()
+        .persistent()
+        .set(&DataKey::Approved(game_id, bet.clone()), &Amountx);
+}
+pub fn get_approve_total(env: Env, game_id: i128, bet: BetKey) -> i128 {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Approved(game_id, bet.clone()))
+        .unwrap_or(0);
+    total_amount
+}
+
+pub fn add_reject_total(env: Env, game_id: i128, Amount: i128, bet: BetKey) {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Rejected(game_id, bet.clone()))
+        .unwrap_or(0);
+    let Amountx = total_amount + Amount;
+    env.storage()
+        .persistent()
+        .set(&DataKey::Rejected(game_id, bet.clone()), &Amountx);
+}
+pub fn get_reject_total(env: Env, game_id: i128, bet: BetKey) -> i128 {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Rejected(game_id, bet.clone()))
+        .unwrap_or(0);
+    total_amount
+}
+pub fn set_pool_total(env: Env, game_id: i128, amount: i128) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::pool(game_id), &amount);
+}
+pub fn minus_pool_total(env: Env, game_id: i128, amountToWithdraw: i128) {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::pool(game_id))
+        .unwrap_or(0);
+    let new_total = total_amount - amountToWithdraw;
+    env.storage()
+        .persistent()
+        .set(&DataKey::pool(game_id), &new_total);
+}
+pub fn set_pool_summiter_total(env: Env, game_id: i128, amount: i128) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::poolSummiter(game_id), &amount);
+}
+pub fn minus_pool__summiter_total(env: Env, game_id: i128, amountToWithdraw: i128) {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::pool(game_id))
+        .unwrap_or(0);
+    let new_total = total_amount - amountToWithdraw;
+    env.storage()
+        .persistent()
+        .set(&DataKey::poolSummiter(game_id), &new_total);
 }

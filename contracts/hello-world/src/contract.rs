@@ -136,6 +136,12 @@ impl betting for BettingContract {
 
             storage::add_privateSettingList(env.clone(), bet.clone().gameid, bet.clone().Setting);
             storage::add_bet(env.clone(), user.clone(), bet.clone());
+            storage::add_not_assesed_yet(
+                env.clone(),
+                bet.clone().Setting,
+                bet.clone().amount_bet,
+                bet.clone().bet,
+            );
             if !privateBet.active {
                 if storage::does_bet_active(env.clone(), bet.clone()) {
                     storage::active_private_setting(env.clone(), user.clone(), bet.clone().Setting);
@@ -178,6 +184,12 @@ impl betting for BettingContract {
                 &((bet.clone().amount_bet * 30) / 100),
             );
             storage::add_bet(env.clone(), user.clone(), bet.clone());
+            storage::add_not_assesed_yet(
+                env.clone(),
+                bet.clone().Setting,
+                bet.clone().amount_bet,
+                bet.clone().bet,
+            );
             storage::add_listUsuers(env.clone(), publicBet.clone().gameid, user.clone());
             if !publicBet.active {
                 if storage::does_bet_active(env.clone(), bet.clone()) {
@@ -388,8 +400,27 @@ impl betting for BettingContract {
                     resultAssessment.clone(),
                 );
             }
+            storage::delete_not_assesed_yet(
+                env.clone(),
+                betResult.clone().Setting,
+                betResult.clone().amount_bet,
+                betResult.clone().bet,
+            );
             if results.pause {
                 storage::puase_ResultGame(env.clone(), game_id.clone(), results.clone().pause);
+                storage::add_reject_total(
+                    env.clone(),
+                    betResult.clone().Setting,
+                    betResult.clone().amount_bet,
+                    betResult.clone().bet,
+                );
+            } else {
+                storage::add_approve_total(
+                    env.clone(),
+                    betResult.clone().Setting,
+                    betResult.clone().amount_bet,
+                    betResult.clone().bet,
+                );
             }
         } else {
             if resultAssessment.CheckApprove.contains(&user)
@@ -464,18 +495,15 @@ impl betting for BettingContract {
             panic_with_error!(&env, BettingError::GameHasNotBeenPaused);
         }
         if xresult.id != result.id {
-            panic!("You cannot set result for this game");
+            panic_with_error!(&env, BettingError::InvalidInputError);
         }
         if xresult.result != result.result {
             complain = 0; // The complain made by the users was correct
         } else {
             complain = 1; // The complain made by the users was incorrect
         }
-        let listedPrivateBet: Vec<(i128)> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::PrivateBetList(result.clone().gameid))
-            .unwrap_or(Vec::new(&env));
+        let listedPrivateBet: Vec<(i128)> =
+            storage::get_privateSettingList(env.clone(), result.clone().gameid);
         Self::distibution(env.clone(), complain, result.clone().gameid, result.clone());
         for setting in listedPrivateBet.iter() {
             let privateBet: PrivateBet = env
@@ -554,6 +582,166 @@ impl betting for BettingContract {
 }
 
 impl BettingContract {
+    fn make_distribution(env: Env, game_id: i128, resultBet: BetKey, complain: i128) {
+        let mut losers_pool: i128 = 0;
+        let mut novote_winner: i128 = 0;
+        let mut s_dishonest: Vec<Address> = Vec::new(&env);
+        let mut s_honest: Vec<Address> = Vec::new(&env);
+        let mut s_noVote: Vec<Address> = Vec::new(&env);
+        let mut resultAssessment: ResultAssessment =
+            storage::get_ResultAssessment(env.clone(), game_id.clone());
+
+        let (exist, startTime, endTime, summiter, checkers, _) =
+            storage::existBet(env.clone(), game_id.clone());
+        if !exist {
+            panic_with_error!(&env, BettingError::GameDoesNotExist);
+        }
+        if endTime > env.ledger().timestamp() as u32 {
+            panic_with_error!(&env, BettingError::GameHasNotFinished);
+        }
+        /// we start we those who did not assess the result
+        /// 1. users who don't participate and win will get the bet 50 % amount back of their bets
+        /// 2. users who don't participate and lose will lose their bet amount
+        for i in 0..=2 {
+            let mut bet_key: BetKey = BetKey::Team_local;
+            match i {
+                0 => {
+                    bet_key = BetKey::Team_local;
+                }
+                1 => {
+                    bet_key = BetKey::Draw;
+                }
+                2 => {
+                    bet_key = BetKey::Team_away;
+                }
+                _ => {}
+            }
+            if resultBet != bet_key {
+                losers_pool += storage::get_not_assesed_yet(env.clone(), game_id.clone(), bet_key);
+            } else {
+                novote_winner = storage::get_not_assesed_yet(env.clone(), game_id.clone(), bet_key);
+            }
+        }
+        let winner_minus_50 = (novote_winner * 50) / 100;
+        losers_pool += winner_minus_50;
+        match complain {
+            0 => {
+                for checker in checkers.iter() {
+                    if resultAssessment.CheckApprove.contains(&checker) {
+                        s_dishonest.push_back(checker.clone());
+                    } else if resultAssessment.CheckReject.contains(&checker) {
+                        s_honest.push_back(checker.clone());
+                    } else {
+                        s_noVote.push_back(checker.clone());
+                    }
+                }
+                losers_pool +=
+                    storage::get_approve_total(env.clone(), game_id.clone(), BetKey::Team_local);
+                losers_pool +=
+                    storage::get_approve_total(env.clone(), game_id.clone(), BetKey::Draw);
+                losers_pool +=
+                    storage::get_approve_total(env.clone(), game_id.clone(), BetKey::Team_away);
+                for i in 0..=2 {
+                    let mut bet_key: BetKey = BetKey::Team_local;
+                    match i {
+                        0 => {
+                            bet_key = BetKey::Team_local;
+                        }
+                        1 => {
+                            bet_key = BetKey::Draw;
+                        }
+                        2 => {
+                            bet_key = BetKey::Team_away;
+                        }
+                        _ => {}
+                    }
+                    if resultBet != bet_key {
+                        losers_pool +=
+                            storage::get_reject_total(env.clone(), game_id.clone(), bet_key);
+                    }
+                }
+            }
+            1 => {
+                for checker in checkers.iter() {
+                    if resultAssessment.CheckApprove.contains(&checker) {
+                        s_honest.push_back(checker.clone());
+                    } else if resultAssessment.CheckReject.contains(&checker) {
+                        s_dishonest.push_back(checker.clone());
+                    } else {
+                        s_noVote.push_back(checker.clone());
+                    }
+                }
+                losers_pool +=
+                    storage::get_reject_total(env.clone(), game_id.clone(), BetKey::Draw);
+                losers_pool +=
+                    storage::get_reject_total(env.clone(), game_id.clone(), BetKey::Team_away);
+                losers_pool +=
+                    storage::get_reject_total(env.clone(), game_id.clone(), BetKey::Team_local);
+                for i in 0..=2 {
+                    let mut bet_key: BetKey = BetKey::Team_local;
+                    match i {
+                        0 => {
+                            bet_key = BetKey::Team_local;
+                        }
+                        1 => {
+                            bet_key = BetKey::Draw;
+                        }
+                        2 => {
+                            bet_key = BetKey::Team_away;
+                        }
+                        _ => {}
+                    }
+                    if resultBet != bet_key {
+                        losers_pool +=
+                            storage::get_approve_total(env.clone(), game_id.clone(), bet_key);
+                    }
+                }
+            }
+            2 => {
+                for checker in checkers.iter() {
+                    if resultAssessment.CheckApprove.contains(&checker) {
+                        s_honest.push_back(checker.clone());
+                    } else if resultAssessment.CheckReject.contains(&checker) {
+                        s_dishonest.push_back(checker.clone());
+                    } else {
+                        s_noVote.push_back(checker.clone());
+                    }
+                }
+                for i in 0..=2 {
+                    let mut bet_key: BetKey = BetKey::Team_local;
+                    match i {
+                        0 => {
+                            bet_key = BetKey::Team_local;
+                        }
+                        1 => {
+                            bet_key = BetKey::Draw;
+                        }
+                        2 => {
+                            bet_key = BetKey::Team_away;
+                        }
+                        _ => {}
+                    }
+                    if resultBet != bet_key {
+                        losers_pool +=
+                            storage::get_approve_total(env.clone(), game_id.clone(), bet_key);
+                    }
+                }
+            }
+            _ => {
+                panic_with_error!(&env, BettingError::InvalidInputError);
+            }
+        }
+
+        let mut summiter_retribution = (losers_pool * 20) / 100;
+        let protocol_retribution = (losers_pool * 10) / 100;
+        losers_pool -= summiter_retribution;
+        losers_pool -= protocol_retribution;
+        let add = 20 * s_dishonest.len() as i128;
+        summiter_retribution += add;
+        storage::set_pool_total(env.clone(), game_id.clone(), losers_pool);
+        storage::set_pool_summiter_total(env.clone(), game_id.clone(), summiter_retribution);
+    }
+
     fn money_back(env: Env, gameid: i128) {
         let (exist, startTime, endTime, summiter, checkers, active) =
             Self::existBet(env.clone(), gameid.clone());
