@@ -33,4 +33,8 @@ pub enum BettingError {
     GameResultNotFound = 214,
     UserCannotVote = 215,
     GameHasNotBeenPaused = 216,
+    NoBetHasBeenFound = 217,
+    NothingToClaim = 218,
+    UserAlreadyClaimed = 219,
+    GameHasBeenPaused = 220,
 }

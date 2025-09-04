@@ -566,30 +566,68 @@ pub fn set_pool_total(env: Env, game_id: i128, amount: i128) {
         .persistent()
         .set(&DataKey::pool(game_id), &amount);
 }
-pub fn minus_pool_total(env: Env, game_id: i128, amountToWithdraw: i128) {
-    let total_amount: i128 = env
+pub fn get_pool_total(env: Env, game_id: i128) -> i128 {
+    let amount: i128 = env
         .storage()
         .persistent()
         .get(&DataKey::pool(game_id))
         .unwrap_or(0);
-    let new_total = total_amount - amountToWithdraw;
-    env.storage()
-        .persistent()
-        .set(&DataKey::pool(game_id), &new_total);
+    amount
 }
 pub fn set_pool_summiter_total(env: Env, game_id: i128, amount: i128) {
     env.storage()
         .persistent()
         .set(&DataKey::poolSummiter(game_id), &amount);
 }
-pub fn minus_pool__summiter_total(env: Env, game_id: i128, amountToWithdraw: i128) {
-    let total_amount: i128 = env
-        .storage()
-        .persistent()
-        .get(&DataKey::pool(game_id))
-        .unwrap_or(0);
-    let new_total = total_amount - amountToWithdraw;
+pub fn save_complain(env: Env, game_id: i128, complain: i128) {
     env.storage()
         .persistent()
-        .set(&DataKey::poolSummiter(game_id), &new_total);
+        .set(&DataKey::Complain(game_id), &complain);
+}
+pub fn get_complain(env: Env, game_id: i128) -> i128 {
+    let complain: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Complain(game_id))
+        .unwrap_or(0);
+    complain
+}
+pub fn save_winnerPool(env: Env, game_id: i128, amount: i128) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::winnerPool(game_id), &amount);
+}
+pub fn get_winnerPool(env: Env, game_id: i128) -> i128 {
+    let amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::winnerPool(game_id))
+        .unwrap_or(0);
+    amount
+}
+pub fn save_loserPool(env: Env, game_id: i128, amount: i128) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::loserPool(game_id), &amount);
+}
+pub fn get_loserPool(env: Env, game_id: i128) -> i128 {
+    let amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::loserPool(game_id))
+        .unwrap_or(0);
+    amount
+}
+pub fn set_didUserWithdraw(env: Env, user: Address, game_id: i128) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::UserWithdraw(game_id, user), &true);
+}
+pub fn get_didUserWithdraw(env: Env, user: Address, game_id: i128) -> bool {
+    let didWithdraw: bool = env
+        .storage()
+        .persistent()
+        .get(&DataKey::UserWithdraw(game_id, user))
+        .unwrap_or(false);
+    didWithdraw
 }

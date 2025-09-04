@@ -99,6 +99,10 @@ pub enum DataKey {
     Approved(i128, BetKey),
     pool(i128),
     poolSummiter(i128),
+    Complain(i128),
+    winnerPool(i128),
+    loserPool(i128),
+    UserWithdraw(i128, Address),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[contracttype]
