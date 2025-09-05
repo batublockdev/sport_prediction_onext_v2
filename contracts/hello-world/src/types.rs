@@ -23,7 +23,7 @@ pub struct Game {
 }
 
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResultGame {
     pub id: i128,
     pub gameid: i128,
@@ -66,7 +66,7 @@ pub struct PublicBet {
     pub description: String,
 }
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Bet {
     pub id: i128,
     pub gameid: i128,
@@ -117,7 +117,7 @@ pub enum AssessmentKey {
     approve,
     reject,
 }
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[contracttype]
 pub enum BetType {
     Public,

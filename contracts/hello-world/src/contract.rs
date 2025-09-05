@@ -4,6 +4,7 @@ use core::{f32::consts::E, panic, result};
 use crate::{
     bettingTrait::betting,
     errors::BettingError,
+    events::BettingEvents,
     storage,
     types::{
         AssessmentKey, Bet, BetKey, BetType, ClaimType, DataKey, Game, LastB, PrivateBet,
@@ -109,7 +110,7 @@ impl betting for BettingContract {
             if !exist {
                 panic_with_error!(&env, BettingError::GameDoesNotExist);
             }
-            if startTime > env.ledger().timestamp() as u32 {
+            if startTime < env.ledger().timestamp() as u32 {
                 panic_with_error!(&env, BettingError::GameHasAlreadyStarted);
             }
             if endTime < env.ledger().timestamp() as u32 {
@@ -160,7 +161,7 @@ impl betting for BettingContract {
             if !exist {
                 panic_with_error!(&env, BettingError::GameDoesNotExist);
             }
-            if startTime > env.ledger().timestamp() as u32 {
+            if startTime < env.ledger().timestamp() as u32 {
                 panic_with_error!(&env, BettingError::GameHasAlreadyStarted);
             }
             if endTime < env.ledger().timestamp() as u32 {
@@ -240,7 +241,7 @@ impl betting for BettingContract {
             if !publicBet.clone().active {
                 let (exist, startTime, endTime, _, _, active) =
                     storage::existBet(env.clone(), publicBet.clone().gameid);
-                if startTime > env.ledger().timestamp() as u32 {
+                if startTime < env.ledger().timestamp() as u32 {
                     Self::moveToken(&env, &usd, &contract_address, &user, &betData.amount_bet);
                     Self::moveToken(
                         &env,
@@ -925,6 +926,7 @@ impl BettingContract {
         }
         let leaderboard: Vec<(Address, i128)> =
             storage::get_leaderboard(env.clone(), game_id.clone());
+        let adminAdr: Address = storage::get_admin(env.clone());
 
         // Limit to top 5
         let mut top = Vec::new(&env);
@@ -942,13 +944,13 @@ impl BettingContract {
         let mut rng = (sequence + timestamp) % (top.len() as u32);
         let mut selected = Vec::new(&env);
         let mut selected_Summitters: Vec<Address> = Vec::new(&env);
+        let mut main_summiter: Address = adminAdr;
         for k in 0..5 {
             let pick = rng % top.len();
             let (addr, score) = top.get(pick).unwrap();
-            let mut checks: Vec<Address> = Vec::new(&env);
             selected.push_back((addr.clone(), score));
             if k == 0 {
-                selected_Summitters.push_back(addr.clone());
+                main_summiter = addr.clone();
             }
             if k > 0 {
                 selected_Summitters.push_back(addr.clone());
@@ -962,9 +964,10 @@ impl BettingContract {
         storage::update_game(
             env.clone(),
             game_id,
-            selected_Summitters.get(0).unwrap().clone(),
-            selected_Summitters,
+            main_summiter.clone(),
+            selected_Summitters.clone(),
         );
+        BettingEvents::summiters_seleted(&env, game_id, selected_Summitters, main_summiter);
     }
     fn moveToken(env: &Env, token: &Address, from: &Address, to: &Address, amount: &i128) {
         let token = token::Client::new(env, token);
