@@ -35,14 +35,16 @@ impl betting for BettingContract {
         // Save data
         storage::init(env, admin, token_usd, token_trust);
     }
-    fn request_result_summiter(env: Env, user: Address, stakeAmount: i128, gameId: i128) -> bool {
+    fn request_result_summiter(env: Env, user: Address, stakeAmount: i128) -> bool {
         user.require_auth();
-        if stakeAmount <= 0 {
-            panic_with_error!(&env, BettingError::NegativeAmountError);
+        let min_stake = storage::get_Min_stakeAmount(env.clone());
+        if stakeAmount <= min_stake {
+            panic_with_error!(&env, BettingError::NotEnoughStake);
         }
-        if gameId <= 0 {
-            panic_with_error!(&env, BettingError::InvalidInputError);
-        }
+        let usd = storage::get_usd(env.clone());
+        let contract_address = env.current_contract_address();
+        Self::moveToken(&env, &usd, &user, &contract_address, &stakeAmount);
+
         /*We nee to set a amount to request for the summiter rol */
         // ✅ Get history map (user → score history)
         let history: i128 = storage::get_history(env.clone(), user.clone());
@@ -51,8 +53,7 @@ impl betting for BettingContract {
         let new_score = (history * 70 + stakeAmount * 30) / 100;
 
         // ✅ Leaderboard vector
-        let mut leaderboard: Vec<(Address, i128)> =
-            storage::get_leaderboard(env.clone(), gameId.clone());
+        let mut leaderboard: Vec<(Address, i128)> = storage::get_leaderboard(env.clone());
 
         // Remove old entry for this user
         let mut i = 0;
@@ -76,10 +77,11 @@ impl betting for BettingContract {
         }
 
         // Insert at correct position
-        leaderboard.insert(insert_index, (user, new_score));
+        leaderboard.insert(insert_index, (user.clone(), new_score));
 
         // Save leaderboard
-        storage::set_leaderboard(env.clone(), gameId, leaderboard);
+        storage::set_leaderboard(env.clone(), leaderboard);
+        storage::set_stakeAmount_user(env.clone(), user.clone(), stakeAmount);
 
         true
     }
@@ -646,6 +648,17 @@ impl betting for BettingContract {
             );
         }
     }
+    fn set_stakeAmount(env: Env, user: Address, amount: i128) {
+        user.require_auth();
+        let adminAdr: Address = storage::get_admin(env.clone());
+        if adminAdr != user {
+            panic_with_error!(&env, BettingError::NotAdmin);
+        }
+        if amount <= 0 {
+            panic_with_error!(&env, BettingError::NegativeAmountError);
+        }
+        storage::set_Min_stakeAmount(env.clone(), amount);
+    }
 }
 
 impl BettingContract {
@@ -663,6 +676,7 @@ impl BettingContract {
         let mut s_dishonest: Vec<Address> = Vec::new(&env);
         let mut s_honest: Vec<Address> = Vec::new(&env);
         let mut s_noVote: Vec<Address> = Vec::new(&env);
+        let mut add = 0;
         let mut resultAssessment: ResultAssessment =
             storage::get_ResultAssessment(env.clone(), game_id.clone());
 
@@ -705,11 +719,22 @@ impl BettingContract {
                 for checker in checkers.iter() {
                     if resultAssessment.CheckApprove.contains(&checker) {
                         s_dishonest.push_back(checker.clone());
+                        add += storage::get_stakeAmount_user_game(
+                            env.clone(),
+                            checker.clone(),
+                            game_id.clone(),
+                        );
                         storage::set_history(env.clone(), checker.clone(), -100);
                     } else if resultAssessment.CheckReject.contains(&checker) {
                         s_honest.push_back(checker.clone());
+                        storage::set_history(env.clone(), checker.clone(), 100);
                     } else {
                         s_noVote.push_back(checker.clone());
+                        add += storage::get_stakeAmount_user_game(
+                            env.clone(),
+                            checker.clone(),
+                            game_id.clone(),
+                        );
                         storage::set_history(env.clone(), checker.clone(), -100);
                     }
                 }
@@ -754,11 +779,22 @@ impl BettingContract {
                 for checker in checkers.iter() {
                     if resultAssessment.CheckApprove.contains(&checker) {
                         s_honest.push_back(checker.clone());
+                        storage::set_history(env.clone(), checker.clone(), 100);
                     } else if resultAssessment.CheckReject.contains(&checker) {
                         s_dishonest.push_back(checker.clone());
+                        add += storage::get_stakeAmount_user_game(
+                            env.clone(),
+                            checker.clone(),
+                            game_id.clone(),
+                        );
                         storage::set_history(env.clone(), checker.clone(), -100);
                     } else {
                         s_noVote.push_back(checker.clone());
+                        add += storage::get_stakeAmount_user_game(
+                            env.clone(),
+                            checker.clone(),
+                            game_id.clone(),
+                        );
                         storage::set_history(env.clone(), checker.clone(), -100);
                     }
                 }
@@ -803,11 +839,22 @@ impl BettingContract {
                 for checker in checkers.iter() {
                     if resultAssessment.CheckApprove.contains(&checker) {
                         s_honest.push_back(checker.clone());
+                        storage::set_history(env.clone(), checker.clone(), 100);
                     } else if resultAssessment.CheckReject.contains(&checker) {
                         s_dishonest.push_back(checker.clone());
+                        add += storage::get_stakeAmount_user_game(
+                            env.clone(),
+                            checker.clone(),
+                            game_id.clone(),
+                        );
                         storage::set_history(env.clone(), checker.clone(), -100);
                     } else {
                         s_noVote.push_back(checker.clone());
+                        add += storage::get_stakeAmount_user_game(
+                            env.clone(),
+                            checker.clone(),
+                            game_id.clone(),
+                        );
                         storage::set_history(env.clone(), checker.clone(), -100);
                     }
                 }
@@ -851,8 +898,6 @@ impl BettingContract {
         let mut protocol_retribution = (amount_gain_pool * 10) / 100;
         amount_gain_pool -= summiter_retribution;
         amount_gain_pool -= protocol_retribution;
-        let mut add = 20 * s_dishonest.len() as i128;
-        add += 20 * s_noVote.len() as i128;
         summiter_retribution += add;
         if winner_pool == 0 {
             if losers_honest_pool == 0 {
@@ -862,12 +907,19 @@ impl BettingContract {
                 amount_gain_pool -= protocol_retribution;
             }
         }
+        if s_honest.len() == 0 {
+            protocol_retribution += summiter_retribution;
+        } else {
+            for honest in s_honest.iter() {
+                let amount = summiter_retribution / s_honest.len() as i128;
+                storage::add_ClaimSummiter(env.clone(), honest.clone(), amount);
+            }
+        }
         storage::add_ClaimProtocol(env.clone(), protocol_retribution);
         storage::save_complain(env.clone(), game_id.clone(), complain);
         storage::save_winnerPool(env.clone(), setting.clone(), winner_pool);
         storage::save_loserPool(env.clone(), setting.clone(), losers_honest_pool);
         storage::set_pool_total(env.clone(), setting.clone(), amount_gain_pool);
-        storage::set_pool_summiter_total(env.clone(), game_id.clone(), summiter_retribution);
         storage::distribution_ResultGame(env.clone(), game_id.clone());
     }
     fn what_kind_user(env: Env, user: Address, setting: i128) -> (i32, i128) {
@@ -963,42 +1015,49 @@ impl BettingContract {
         if !exist {
             panic_with_error!(&env, BettingError::GameDoesNotExist);
         }
-        let leaderboard: Vec<(Address, i128)> =
-            storage::get_leaderboard(env.clone(), game_id.clone());
+        let mut leaderboard: Vec<(Address, i128)> = storage::get_leaderboard(env.clone());
         let adminAdr: Address = storage::get_admin(env.clone());
+        let mut main_summiter: Address = adminAdr;
+        let mut selected_Summitters: Vec<Address> = Vec::new(&env);
 
         // Limit to top 5
-        let mut top = Vec::new(&env);
-        for i in 0..10 {
-            if let Some((addr, score)) = leaderboard.get(i) {
-                if score == 0 {
+        if leaderboard.len() != 0 {
+            let mut top = Vec::new(&env);
+            for i in 0..9 {
+                if let Some((addr, score)) = leaderboard.get(i) {
+                    if score == 0 {
+                        break;
+                    }
+                    top.push_back((addr.clone(), score));
+                }
+            }
+
+            let sequence = env.ledger().sequence();
+            let timestamp = env.ledger().timestamp() as u32;
+            let mut rng = (sequence + timestamp) % (top.len() as u32);
+            let mut selected = Vec::new(&env);
+            for k in 0..4 {
+                let pick = rng % top.len();
+                let (addr, score) = top.get(pick).unwrap();
+                selected.push_back((addr.clone(), score));
+                if k == 0 {
+                    main_summiter = addr.clone();
+                    storage::set_stakeAmount_user_game(env.clone(), addr.clone(), game_id.clone());
+                }
+                if k > 0 {
+                    selected_Summitters.push_back(addr.clone());
+                    storage::set_stakeAmount_user_game(env.clone(), addr.clone(), game_id.clone());
+                }
+
+                top.remove(pick); // remove picked
+                if let Some(pos) = leaderboard.iter().position(|(a, _)| a == addr) {
+                    leaderboard.remove(pos.try_into().unwrap());
+                }
+                if top.len() == 0 {
                     break;
                 }
-                top.push_back((addr.clone(), score));
             }
-        }
-
-        let sequence = env.ledger().sequence();
-        let timestamp = env.ledger().timestamp() as u32;
-        let mut rng = (sequence + timestamp) % (top.len() as u32);
-        let mut selected = Vec::new(&env);
-        let mut selected_Summitters: Vec<Address> = Vec::new(&env);
-        let mut main_summiter: Address = adminAdr;
-        for k in 0..5 {
-            let pick = rng % top.len();
-            let (addr, score) = top.get(pick).unwrap();
-            selected.push_back((addr.clone(), score));
-            if k == 0 {
-                main_summiter = addr.clone();
-            }
-            if k > 0 {
-                selected_Summitters.push_back(addr.clone());
-            }
-
-            top.remove(pick); // remove picked
-            if top.len() == 0 {
-                break;
-            }
+            storage::set_leaderboard(env.clone(), leaderboard);
         }
         storage::update_game(
             env.clone(),

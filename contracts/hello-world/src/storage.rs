@@ -62,17 +62,54 @@ pub fn set_history(env: Env, user: Address, points: i128) {
         .persistent()
         .set(&DataKey::History_Summiter(user.clone()), &total_history);
 }
-pub fn get_leaderboard(env: Env, gameId: i128) -> Vec<(Address, i128)> {
+pub fn get_leaderboard(env: Env) -> Vec<(Address, i128)> {
     env.storage()
         .persistent()
-        .get(&DataKey::GameSummiters(gameId))
+        .get(&DataKey::GameSummiters)
         .unwrap_or(Vec::new(&env))
 }
-pub fn set_leaderboard(env: Env, gameId: i128, leaderboard: Vec<(Address, i128)>) -> bool {
+pub fn set_leaderboard(env: Env, leaderboard: Vec<(Address, i128)>) -> bool {
     env.storage()
         .persistent()
-        .set(&DataKey::GameSummiters(gameId), &leaderboard);
+        .set(&DataKey::GameSummiters, &leaderboard);
     true
+}
+pub fn set_stakeAmount_user(env: Env, user: Address, stakeAmount: i128) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::StakeUserAmount(user), &stakeAmount);
+}
+
+pub fn set_stakeAmount_user_game(env: Env, user: Address, game: i128) {
+    let amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::StakeUserAmount(user.clone()))
+        .unwrap_or(0);
+    env.storage()
+        .persistent()
+        .set(&DataKey::StakeUserGameAmount(user, game), &amount);
+}
+pub fn get_stakeAmount_user_game(env: Env, user: Address, game: i128) -> i128 {
+    let amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::StakeUserGameAmount(user, game))
+        .unwrap_or(0);
+    amount
+}
+pub fn set_Min_stakeAmount(env: Env, stakeAmount: i128) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::StakeMinAmount, &stakeAmount);
+}
+pub fn get_Min_stakeAmount(env: Env) -> i128 {
+    let amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::StakeMinAmount)
+        .unwrap_or(0);
+    amount
 }
 pub fn update_game(env: Env, gameId: i128, summiter: Address, checkers: Vec<(Address)>) {
     env.storage()

@@ -93,17 +93,6 @@ mod tests {
     }
 
     #[test]
-    fn test_init_success() {}
-    // Test error = AlreadyInitializedError
-    #[test]
-    #[should_panic(expected = "Error(Contract, #3)")]
-    fn test_init_already_initialized() {
-        let (env, client, admin, _, token_usd, token_trust, _, _, _, _) = create_test_env();
-
-        //client.__constructor(&admin, &token_usd, &token_trust);
-    }
-
-    #[test]
     fn test_request_result_summiter() {
         let (env, client, admin, user, token_usd, token_trust, _, _, _, _) = create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
@@ -111,17 +100,17 @@ mod tests {
         let game_id = 1;
         let stake_amount = 1000;
 
-        let result = client.request_result_summiter(&user, &stake_amount, &game_id);
+        let result = client.request_result_summiter(&user, &stake_amount);
         assert_eq!(result, true);
     }
     // Test error =Negative amount
     #[test]
-    #[should_panic(expected = "Error(Contract, #8)")]
+    #[should_panic(expected = "Error(Contract, #223)")]
     fn test_request_result_summiter_negative_amount() {
         let (env, client, admin, user, token_usd, token_trust, _, _, _, _) = create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
 
-        client.request_result_summiter(&user, &-100, &1); // Should panic
+        client.request_result_summiter(&user, &-100); // Should panic
     }
 
     #[test]
@@ -303,9 +292,11 @@ mod tests {
         client.set_game(&game, &signaturex, &public_key);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
-        client.request_result_summiter(&summiter, &1000, &game_id);
         let summiter2 = Address::generate(&env);
-        client.request_result_summiter(&summiter2, &1000, &game_id);
+        adm_usd.mint(&summiter, &100_000_000);
+        adm_usd.mint(&summiter2, &100_000_000);
+        client.request_result_summiter(&summiter, &1000);
+        client.request_result_summiter(&summiter2, &1000);
 
         //let's bet to active the game
         let bet = Bet {
@@ -423,9 +414,11 @@ mod tests {
         client.set_game(&game, &signaturex, &public_key);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
-        client.request_result_summiter(&summiter, &1000, &game_id);
         let summiter2 = Address::generate(&env);
-        client.request_result_summiter(&summiter2, &1000, &game_id);
+        adm_usd.mint(&summiter, &100_000_000);
+        adm_usd.mint(&summiter2, &100_000_000);
+        client.request_result_summiter(&summiter, &1000);
+        client.request_result_summiter(&summiter2, &1000);
 
         //let's bet to active the game
         let bet = Bet {
@@ -466,7 +459,170 @@ mod tests {
 
         client.assessResult(&user, &bet, &game_id, &AssessmentKey::approve);
     }
+    #[test]
+    fn test_adm_summitter() {
+        let (
+            env,
+            client,
+            admin,
+            user,
+            token_usd,
+            token_trust,
+            token_usd_client,
+            token_trust_client,
+            adm_usd,
+            adm_trust,
+        ) = create_test_env();
+        //client.init(&admin, &token_usd, &token_trust);
 
+        // Set up a game
+        let game_id = 1;
+        let game = Game {
+            id: game_id,
+            startTime: 1000,
+            endTime: 2000,
+            summiter: Address::generate(&env),
+            Checker: soroban_sdk::Vec::new(&env),
+            active: false,
+            league: 1,
+            description: String::from_slice(&env, "Team A vs Team B"),
+            team_local: 33,
+            team_away: 44,
+        };
+        // Encode game to Bytes (variable length)
+        let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
+
+        let signer1 = Keypair::generate(&mut thread_rng());
+        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
+
+        let signaturex: BytesN<64> =
+            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, &public_key);
+        //add the user who wna tto participate as a summiter
+        let summiter = Address::generate(&env);
+        let summiter2 = Address::generate(&env);
+        adm_usd.mint(&summiter, &100_000_000);
+        adm_usd.mint(&summiter2, &100_000_000);
+
+        client.request_result_summiter(&summiter, &1000);
+        client.request_result_summiter(&summiter2, &1000);
+
+        //let's bet to active the game
+        let bet = Bet {
+            id: 1,
+            Setting: game_id,
+            bet: BetKey::Team_local,
+            amount_bet: 1000,
+            betType: BetType::Public,
+            gameid: game_id,
+        };
+        let initial_usd_balance = token_usd_client.balance(&user);
+        let initial_trust_balance = token_trust_client.balance(&user);
+        client.bet(&user, &bet);
+        let user2 = Address::generate(&env);
+        adm_usd.mint(&user2, &100_000_000);
+        adm_trust.mint(&user2, &100_000_000);
+
+        let betx = Bet {
+            id: 2,
+            Setting: game_id,
+            bet: BetKey::Team_away,
+            amount_bet: 1000,
+            betType: BetType::Public,
+            gameid: game_id,
+        };
+        client.bet(&user2, &betx);
+        // Set ledger timestamp after game end
+        set_ledger_timestamp(&env, 2500);
+
+        let result = ResultGame {
+            id: 1,
+            gameid: game_id,
+            result: BetKey::Team_local,
+            pause: false,
+            description: String::from_str(&env, "Final Score 2-1"),
+            distribution_executed: false,
+        };
+
+        client.summitResult(&summiter2, &result);
+
+        client.assessResult(&user, &bet, &game_id, &AssessmentKey::approve);
+
+        // Execute distribution
+        client.execute_distribution(&game_id);
+        // Claim as winner
+
+        client.claim(&user, &ClaimType::User, &game_id);
+        client.claim(&summiter2, &ClaimType::Summiter, &game_id);
+
+        //Repaet Process
+
+        // Set up a game
+        let game_id = 31;
+        let game = Game {
+            id: game_id,
+            startTime: 3000,
+            endTime: 4000,
+            summiter: Address::generate(&env),
+            Checker: soroban_sdk::Vec::new(&env),
+            active: false,
+            league: 1,
+            description: String::from_slice(&env, "Team A vs Team B"),
+            team_local: 33,
+            team_away: 44,
+        };
+        // Encode game to Bytes (variable length)
+        let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
+
+        let signer1 = Keypair::generate(&mut thread_rng());
+        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
+
+        let signaturex: BytesN<64> =
+            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, &public_key);
+
+        //let's bet to active the game
+        let bet = Bet {
+            id: 12,
+            Setting: game_id,
+            bet: BetKey::Team_local,
+            amount_bet: 1000,
+            betType: BetType::Public,
+            gameid: game_id,
+        };
+        client.bet(&user, &bet);
+
+        let betx = Bet {
+            id: 22,
+            Setting: game_id,
+            bet: BetKey::Team_away,
+            amount_bet: 1000,
+            betType: BetType::Public,
+            gameid: game_id,
+        };
+        client.bet(&user2, &betx);
+        set_ledger_timestamp(&env, 4500);
+
+        let result = ResultGame {
+            id: 1,
+            gameid: game_id,
+            result: BetKey::Team_local,
+            pause: false,
+            description: String::from_str(&env, "Final Score 2-1"),
+            distribution_executed: false,
+        };
+
+        client.summitResult(&admin, &result);
+
+        client.assessResult(&user, &bet, &game_id, &AssessmentKey::approve);
+
+        // Execute distribution
+        client.execute_distribution(&game_id);
+        // Claim as winner
+
+        client.claim(&user, &ClaimType::User, &game_id);
+        client.claim(&admin, &ClaimType::Summiter, &game_id);
+    }
     #[test]
     fn test_claim_winner_honest() {
         let (
@@ -508,9 +664,12 @@ mod tests {
         client.set_game(&game, &signaturex, &public_key);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
-        client.request_result_summiter(&summiter, &1000, &game_id);
         let summiter2 = Address::generate(&env);
-        client.request_result_summiter(&summiter2, &1000, &game_id);
+        adm_usd.mint(&summiter, &100_000_000);
+        adm_usd.mint(&summiter2, &100_000_000);
+
+        client.request_result_summiter(&summiter, &1000);
+        client.request_result_summiter(&summiter2, &1000);
 
         //let's bet to active the game
         let bet = Bet {
@@ -521,6 +680,8 @@ mod tests {
             betType: BetType::Public,
             gameid: game_id,
         };
+        let initial_usd_balance = token_usd_client.balance(&user);
+        let initial_trust_balance = token_trust_client.balance(&user);
         client.bet(&user, &bet);
         let user2 = Address::generate(&env);
         adm_usd.mint(&user2, &100_000_000);
@@ -554,14 +715,13 @@ mod tests {
         // Execute distribution
         client.execute_distribution(&game_id);
         // Claim as winner
-        let initial_usd_balance = token_usd_client.balance(&user);
-        let initial_trust_balance = token_trust_client.balance(&user);
 
         client.claim(&user, &ClaimType::User, &game_id);
+        client.claim(&summiter2, &ClaimType::Summiter, &game_id);
 
         // Verify token transfers (winner gets bet + share of pool)
         assert!(token_usd_client.balance(&user) > initial_usd_balance);
-        //assert_eq!(token_trust_client.balance(&user), initial_trust_balance + 300); // Trust tokens returned
+        assert_eq!(token_trust_client.balance(&user), initial_trust_balance); // Trust tokens returned
     }
 
     #[test]
@@ -606,9 +766,11 @@ mod tests {
         client.set_game(&game, &signaturex, &public_key);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
-        client.request_result_summiter(&summiter, &1000, &game_id);
         let summiter2 = Address::generate(&env);
-        client.request_result_summiter(&summiter2, &1000, &game_id);
+        adm_usd.mint(&summiter, &100_000_000);
+        adm_usd.mint(&summiter2, &100_000_000);
+        client.request_result_summiter(&summiter, &1000);
+        client.request_result_summiter(&summiter2, &1000);
 
         //let's bet to active the game
         let bet = Bet {
@@ -691,9 +853,11 @@ mod tests {
         client.set_game(&game, &signaturex, &public_key);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
-        client.request_result_summiter(&summiter, &1000, &game_id);
         let summiter2 = Address::generate(&env);
-        client.request_result_summiter(&summiter2, &1000, &game_id);
+        adm_usd.mint(&summiter, &100_000_000);
+        adm_usd.mint(&summiter2, &100_000_000);
+        client.request_result_summiter(&summiter, &1000);
+        client.request_result_summiter(&summiter2, &1000);
 
         //let's bet to active the game
         let bet = Bet {
@@ -783,9 +947,11 @@ mod tests {
         client.set_game(&game, &signaturex, &public_key);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
-        client.request_result_summiter(&summiter, &1000, &game_id);
         let summiter2 = Address::generate(&env);
-        client.request_result_summiter(&summiter2, &1000, &game_id);
+        adm_usd.mint(&summiter, &100_000_000);
+        adm_usd.mint(&summiter2, &100_000_000);
+        client.request_result_summiter(&summiter, &1000);
+        client.request_result_summiter(&summiter2, &1000);
 
         //let's bet to active the game
         let bet = Bet {
@@ -796,6 +962,8 @@ mod tests {
             betType: BetType::Public,
             gameid: game_id,
         };
+        let initial_usd_balance = token_usd_client.balance(&user);
+        let initial_trust_balance = token_trust_client.balance(&user);
         client.bet(&user, &bet);
         let user2 = Address::generate(&env);
         adm_usd.mint(&user2, &100_000_000);
@@ -834,13 +1002,12 @@ mod tests {
         client.assessResult(&user, &bet, &game_id, &AssessmentKey::reject);
         client.setResult_supremCourt(&user, &result2);
         // Execute distribution
-        let initial_usd_balance = token_usd_client.balance(&user);
-        let initial_trust_balance = token_trust_client.balance(&user);
 
         client.claim(&user, &ClaimType::User, &game_id);
 
         // Verify token transfers (winner gets bet + share of pool)
         assert!(token_usd_client.balance(&user) > initial_usd_balance);
+        assert_eq!(token_trust_client.balance(&user), initial_trust_balance); // Trust tokens returned
     }
     #[test]
     fn test_set_private() {
@@ -883,9 +1050,11 @@ mod tests {
         client.set_game(&game, &signaturex, &public_key);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
-        client.request_result_summiter(&summiter, &1000, &game_id);
         let summiter2 = Address::generate(&env);
-        client.request_result_summiter(&summiter2, &1000, &game_id);
+        adm_usd.mint(&summiter, &100_000_000);
+        adm_usd.mint(&summiter2, &100_000_000);
+        client.request_result_summiter(&summiter, &1000);
+        client.request_result_summiter(&summiter2, &1000);
         let user2 = Address::generate(&env);
 
         let privateSetting = PrivateBet {
@@ -959,7 +1128,7 @@ mod tests {
         // Verify token transfers (winner gets bet + share of pool)
         assert!(token_usd_client.balance(&user) > initial_usd_balance);
         assert_eq!(token_trust_client.balance(&user), initial_trust_balance); // Trust tokens returned
-                                                                              //assert!(token_usd_client.balance(&user2) > initial_usd_balance2);
+        assert!(token_usd_client.balance(&user2) < initial_usd_balance2);
         assert_eq!(token_trust_client.balance(&user2), initial_trust_balance2); // Trust tokens returned
     }
     #[test]
@@ -1003,9 +1172,11 @@ mod tests {
         client.set_game(&game, &signaturex, &public_key);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
-        client.request_result_summiter(&summiter, &1000, &game_id);
         let summiter2 = Address::generate(&env);
-        client.request_result_summiter(&summiter2, &1000, &game_id);
+        adm_usd.mint(&summiter, &100_000_000);
+        adm_usd.mint(&summiter2, &100_000_000);
+        client.request_result_summiter(&summiter, &1000);
+        client.request_result_summiter(&summiter2, &1000);
         let user2 = Address::generate(&env);
 
         let privateSetting = PrivateBet {
@@ -1027,6 +1198,8 @@ mod tests {
             gameid: game_id,
         };
 
+        let initial_usd_balance = token_usd_client.balance(&user);
+        let initial_trust_balance = token_trust_client.balance(&user);
         client.bet(&user, &bet);
         adm_usd.mint(&user2, &100_000_000);
         adm_trust.mint(&user2, &100_000_000);
@@ -1064,8 +1237,6 @@ mod tests {
         client.assessResult(&user, &bet, &game_id, &AssessmentKey::reject);
         client.setResult_supremCourt(&user, &result2);
         // Execute distribution
-        let initial_usd_balance = token_usd_client.balance(&user);
-        let initial_trust_balance = token_trust_client.balance(&user);
 
         client.claim(&user, &ClaimType::User, &11);
 
