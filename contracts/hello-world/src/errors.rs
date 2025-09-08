@@ -37,4 +37,5 @@ pub enum BettingError {
     NothingToClaim = 218,
     UserAlreadyClaimed = 219,
     GameHasBeenPaused = 220,
+    GameHasAlreadyBeenExecuted = 221,
 }

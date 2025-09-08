@@ -600,7 +600,7 @@
                 {
                   "vec": [
                     {
-                      "symbol": "approve"
+                      "symbol": "reject"
                     }
                   ]
                 }
@@ -610,7 +610,8 @@
           "sub_invocations": []
         }
       ]
-    ]
+    ],
+    []
   ],
   "ledger": {
     "protocol_version": 23,
@@ -973,65 +974,6 @@
             "ext": "v0"
           },
           6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "Approved"
-                },
-                {
-                  "i128": "1"
-                },
-                {
-                  "vec": [
-                    {
-                      "symbol": "Team_local"
-                    }
-                  ]
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "Approved"
-                    },
-                    {
-                      "i128": "1"
-                    },
-                    {
-                      "vec": [
-                        {
-                          "symbol": "Team_local"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "i128": "1000"
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          0
         ]
       ],
       [
@@ -1623,6 +1565,65 @@
             "key": {
               "vec": [
                 {
+                  "symbol": "Rejected"
+                },
+                {
+                  "i128": "1"
+                },
+                {
+                  "vec": [
+                    {
+                      "symbol": "Team_local"
+                    }
+                  ]
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Rejected"
+                    },
+                    {
+                      "i128": "1"
+                    },
+                    {
+                      "vec": [
+                        {
+                          "symbol": "Team_local"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "i128": "1000"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          0
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM",
+            "key": {
+              "vec": [
+                {
                   "symbol": "Result"
                 },
                 {
@@ -1690,7 +1691,7 @@
                         "symbol": "pause"
                       },
                       "val": {
-                        "bool": false
+                        "bool": true
                       }
                     },
                     {
@@ -1772,11 +1773,7 @@
                         "symbol": "UsersApprove"
                       },
                       "val": {
-                        "vec": [
-                          {
-                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                          }
-                        ]
+                        "vec": []
                       }
                     },
                     {
@@ -1784,7 +1781,11 @@
                         "symbol": "UsersReject"
                       },
                       "val": {
-                        "vec": []
+                        "vec": [
+                          {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                          }
+                        ]
                       }
                     },
                     {

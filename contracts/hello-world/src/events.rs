@@ -1,11 +1,15 @@
-use soroban_sdk::{vec, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{contractevent, vec, Address, Env, String, Symbol, Vec};
+
+#[contractevent(topics = ["BettingGame", "Seleted_Suimmiters"], data_format = "single-value")]
+struct SummitersSeletedEvent {
+    game_id: i128,
+}
 
 pub struct BettingEvents {}
 
 impl BettingEvents {
     pub fn summiters_seleted(e: &Env, game_id: i128, summiters: Vec<Address>, main: Address) {
-        let topics = (Symbol::new(&e, "summiters_seleted"), game_id);
-        e.events().publish(topics, (summiters, main));
+        SummitersSeletedEvent { game_id }.publish(&e);
     }
 
     /// Emitted when a proposal is canceled

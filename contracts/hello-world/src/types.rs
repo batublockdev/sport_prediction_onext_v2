@@ -30,6 +30,7 @@ pub struct ResultGame {
     pub description: String,
     pub result: BetKey,
     pub pause: bool,
+    pub distribution_executed: bool,
 }
 #[contracttype]
 #[derive(Clone)]

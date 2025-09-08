@@ -300,6 +300,7 @@ pub fn get_ResultGame(env: Env, game_id: i128) -> ResultGame {
             description: String::from_slice(&env, "No result found"),
             result: BetKey::Team_local,
             pause: false,
+            distribution_executed: false,
         });
     result
 }
@@ -313,11 +314,29 @@ pub fn puase_ResultGame(env: Env, game_id: i128, pause: bool) {
                 description: String::from_str(&env, ""),
                 result: BetKey::Team_local,
                 pause: false,
+                distribution_executed: false,
             });
             res.pause = pause;
             res
         });
 }
+pub fn distribution_ResultGame(env: Env, game_id: i128) {
+    env.storage()
+        .persistent()
+        .update(&DataKey::Result(game_id), |old: Option<ResultGame>| {
+            let mut res = old.unwrap_or(ResultGame {
+                id: 0,
+                gameid: 0,
+                description: String::from_str(&env, ""),
+                result: BetKey::Team_local,
+                pause: false,
+                distribution_executed: false,
+            });
+            res.distribution_executed = true;
+            res
+        });
+}
+
 pub fn get_ListBetUser(env: Env, gameid: i128) -> Vec<(Address)> {
     env.storage()
         .persistent()
