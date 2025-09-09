@@ -4,6 +4,7 @@ use crate::types::{
 };
 use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Vec};
 const ADMIN_KEY: Symbol = Symbol::short("ADMIN");
+const SUPREME_KEY: Symbol = Symbol::short("ADMIN");
 const TOKEN_USD_KEY: Symbol = Symbol::short("TOKEN_USD");
 const TOKEN_TRUST_KEY: Symbol = Symbol::short("TK_TRUST");
 const LEADERBOARD: Symbol = symbol_short!("LB");
@@ -20,12 +21,25 @@ pub fn get_dummyusser(env: &Env) -> Address {
 pub fn has_init(env: &Env) -> bool {
     env.storage().instance().has(&ADMIN_KEY)
 }
-pub fn init(env: Env, admin: Address, token_usd: Address, token_trust: Address) {
+pub fn init(
+    env: Env,
+    admin: Address,
+    token_usd: Address,
+    token_trust: Address,
+    supreme_court: Address,
+) {
     // save the admin
     env.storage().instance().set(&ADMIN_KEY, &admin);
     // save the token addresses
     env.storage().instance().set(&TOKEN_USD_KEY, &token_usd);
     env.storage().instance().set(&TOKEN_TRUST_KEY, &token_trust);
+    env.storage().instance().set(&SUPREME_KEY, &supreme_court);
+}
+pub fn get_supreme(env: Env) -> Address {
+    env.storage()
+        .instance()
+        .get(&SUPREME_KEY)
+        .unwrap_or_else(|| panic!("contract not initialized"))
 }
 pub fn get_usd(env: Env) -> Address {
     env.storage()

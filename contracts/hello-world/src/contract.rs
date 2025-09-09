@@ -10,22 +10,29 @@ use crate::{
         AssessmentKey, Bet, BetKey, BetType, ClaimType, DataKey, Game, LastB, PrivateBet,
         PublicBet, ResultAssessment, ResultGame,
     },
+    Constants::{
+        HUNDRED_POINTS, LESS_HUNDRED_POINTS, ONE_HOUR_SECONDS, SCORE_HISTORY_WEIGHT,
+        TRUST_TOKEN_PERCENTAGE, VOTE_HISTORY_WEIGHT,
+    },
 };
 use soroban_sdk::{
     contract, contractevent, contractimpl, panic_with_error, symbol_short, token, vec,
     xdr::{ScVal, ToXdr, WriteXdr},
     Address, Bytes, BytesN, Env, IntoVal, String, Symbol, Vec,
 };
-#[contractevent(topics = ["COUNTER", "increment"], data_format = "single-value")]
-struct IncrementEvent {
-    count: u32,
-}
+
 #[contract]
 pub struct BettingContract;
 
 #[contractimpl]
 impl betting for BettingContract {
-    fn __constructor(env: Env, admin: Address, token_usd: Address, token_trust: Address) {
+    fn __constructor(
+        env: Env,
+        admin: Address,
+        token_usd: Address,
+        token_trust: Address,
+        supreme_court: Address,
+    ) {
         admin.require_auth();
 
         // check if already initialized
@@ -33,8 +40,14 @@ impl betting for BettingContract {
             panic_with_error!(&env, BettingError::AlreadyInitializedError);
         }
         // Save data
-        storage::init(env, admin, token_usd, token_trust);
+        storage::init(env, admin, token_usd, token_trust, supreme_court);
     }
+    /*
+       @dev this funtion request to be a result summiter
+       @param env Environment
+       @param user Address The address of the user
+       @param stakeAmount i128 The amount to stake
+    */
     fn request_result_summiter(env: Env, user: Address, stakeAmount: i128) -> bool {
         user.require_auth();
         let min_stake = storage::get_Min_stakeAmount(env.clone());
@@ -50,7 +63,7 @@ impl betting for BettingContract {
         let history: i128 = storage::get_history(env.clone(), user.clone());
 
         // ✅ Weighted score calculation
-        let new_score = (history * 70 + stakeAmount * 30) / 100;
+        let new_score = (history * VOTE_HISTORY_WEIGHT + stakeAmount * SCORE_HISTORY_WEIGHT) / 100;
 
         // ✅ Leaderboard vector
         let mut leaderboard: Vec<(Address, i128)> = storage::get_leaderboard(env.clone());
@@ -85,7 +98,12 @@ impl betting for BettingContract {
 
         true
     }
-
+    /*
+       @dev this funtion bet on a game
+       @param env Environment
+       @param user Address The address of the user
+       @param bet Bet The bet data
+    */
     fn bet(env: Env, user: Address, bet: Bet) {
         user.require_auth();
         let contract_address = env.current_contract_address();
@@ -96,6 +114,20 @@ impl betting for BettingContract {
         }
         if bet.clone().id == 0 || bet.clone().Setting == 0 || bet.clone().gameid == 0 {
             panic_with_error!(&env, BettingError::InvalidInputError);
+        }
+        let (exist, startTime, endTime, _, _, active) =
+            storage::existBet(env.clone(), bet.clone().gameid);
+        if !exist {
+            panic_with_error!(&env, BettingError::GameDoesNotExist);
+        }
+        if startTime < env.ledger().timestamp() as u32 {
+            panic_with_error!(&env, BettingError::GameHasAlreadyStarted);
+        }
+        if endTime < env.ledger().timestamp() as u32 {
+            panic_with_error!(&env, BettingError::Game_HasFinished);
+        }
+        if storage::CheckUser(env.clone(), user.clone(), bet.clone().gameid) {
+            panic_with_error!(&env, BettingError::Summiters_notAllowToBet);
         }
 
         if bet.clone().betType == BetType::Private {
@@ -110,36 +142,6 @@ impl betting for BettingContract {
             if bet.clone().amount_bet < privateBet.clone().amount_bet_min {
                 panic_with_error!(&env, BettingError::PrivateBet_NotEnoughToBet);
             }
-            let (exist, startTime, endTime, _, _, active) =
-                storage::existBet(env.clone(), privateBet.clone().gameid);
-            if !exist {
-                panic_with_error!(&env, BettingError::GameDoesNotExist);
-            }
-            if startTime < env.ledger().timestamp() as u32 {
-                panic_with_error!(&env, BettingError::GameHasAlreadyStarted);
-            }
-            if endTime < env.ledger().timestamp() as u32 {
-                panic_with_error!(&env, BettingError::Game_HasFinished);
-            }
-            if storage::CheckUser(env.clone(), user.clone(), privateBet.clone().gameid) {
-                panic_with_error!(&env, BettingError::Summiters_notAllowToBet);
-            }
-
-            Self::moveToken(
-                &env,
-                &usd,
-                &user,
-                &contract_address,
-                &bet.clone().amount_bet,
-            );
-            Self::moveToken(
-                &env,
-                &trust,
-                &user,
-                &contract_address,
-                &((bet.clone().amount_bet * 30) / 100),
-            );
-
             storage::add_privateSettingList(env.clone(), bet.clone().gameid, bet.clone().Setting);
             storage::add_bet(env.clone(), user.clone(), bet.clone());
             storage::add_not_assesed_yet(
@@ -161,34 +163,6 @@ impl betting for BettingContract {
             if publicBet.clone().id == 0 {
                 panic_with_error!(&env, BettingError::SettingBetDoesNotExist);
             }
-            let (exist, startTime, endTime, _, _, active) =
-                storage::existBet(env.clone(), publicBet.clone().gameid);
-            if !exist {
-                panic_with_error!(&env, BettingError::GameDoesNotExist);
-            }
-            if startTime < env.ledger().timestamp() as u32 {
-                panic_with_error!(&env, BettingError::GameHasAlreadyStarted);
-            }
-            if endTime < env.ledger().timestamp() as u32 {
-                panic_with_error!(&env, BettingError::Game_HasFinished);
-            }
-            if storage::CheckUser(env.clone(), user.clone(), publicBet.clone().gameid) {
-                panic_with_error!(&env, BettingError::Summiters_notAllowToBet);
-            }
-            Self::moveToken(
-                &env,
-                &usd,
-                &user,
-                &contract_address,
-                &bet.clone().amount_bet,
-            );
-            Self::moveToken(
-                &env,
-                &trust,
-                &user,
-                &contract_address,
-                &((bet.clone().amount_bet * 30) / 100),
-            );
             storage::add_bet(env.clone(), user.clone(), bet.clone());
             storage::add_not_assesed_yet(
                 env.clone(),
@@ -206,8 +180,27 @@ impl betting for BettingContract {
                 }
             }
         }
+        Self::moveToken(
+            &env,
+            &usd,
+            &user,
+            &contract_address,
+            &bet.clone().amount_bet,
+        );
+        Self::moveToken(
+            &env,
+            &trust,
+            &user,
+            &contract_address,
+            &((bet.clone().amount_bet * TRUST_TOKEN_PERCENTAGE) / 100),
+        );
     }
-
+    /*
+       @dev This function claim the money bet when the game has not been activated ( all users have bet on the same )
+       @param env Environment
+       @param user Address The address of the user
+       @param setting i128 The id of the setting
+    */
     fn claim_money_noactive(env: Env, user: Address, setting: i128) {
         user.require_auth();
         let contract_address = env.current_contract_address();
@@ -265,7 +258,13 @@ impl betting for BettingContract {
             panic!("Invalid bet type");
         }
     }
-    //admin address
+    /*
+       @dev This function set a game to be bet on with the admin premission
+       @param env Environment
+       @param game Game The game data
+       @param signature BytesN<64> The signature of the game data
+       @param pub_key BytesN<32> The public key of the signer
+    */
     fn set_game(env: Env, game: Game, signature: BytesN<64>, pub_key: BytesN<32>) {
         let (exist, startTime, endTime, summiter, checkers, _) =
             storage::existBet(env.clone(), game.clone().id);
@@ -292,6 +291,13 @@ impl betting for BettingContract {
         };
         storage::set_publicSetting(env.clone(), pubSetting);
     }
+    /*
+       @dev This function set a private bet setting for a game
+       @param env Environment
+       @param user Address The address of the user
+       @param privateData PrivateBet The private bet data
+       @param game_id i128 The id of the game
+    */
     fn set_private_bet(env: Env, user: Address, privateData: PrivateBet, game_id: i128) {
         user.require_auth();
 
@@ -310,7 +316,12 @@ impl betting for BettingContract {
         }
         storage::set_privateSetting(env.clone(), privateData.clone());
     }
-
+    /*
+       @dev This function summit the result of the game
+       @param env Environment
+       @param user Address The address of the user
+       @param result ResultGame The result of the game
+    */
     fn summitResult(env: Env, user: Address, result: ResultGame) -> ResultGame {
         user.require_auth();
         let (exist, startTime, endTime, summiter, checkers, active) =
@@ -328,7 +339,7 @@ impl betting for BettingContract {
         if result.clone().distribution_executed || result.clone().pause {
             panic_with_error!(&env, BettingError::InvalidInputError);
         }
-        if endTime + (1 * 60 * 60) < env.ledger().timestamp() as u32 {
+        if endTime + (1 * ONE_HOUR_SECONDS) < env.ledger().timestamp() as u32 {
             let receivedResult: ResultGame =
                 storage::get_ResultGame(env.clone(), result.clone().gameid);
             if receivedResult.id == 0 {
@@ -346,7 +357,7 @@ impl betting for BettingContract {
                 //We need to set the stake amount
                 let stake: i128 = 20;
                 storage::add_Fine(env.clone(), result.clone().gameid, stake);
-                if endTime + (2 * 60 * 60) < env.ledger().timestamp() as u32 {
+                if endTime + (2 * ONE_HOUR_SECONDS) < env.ledger().timestamp() as u32 {
                     // 2 hours with no summition then the supreme court is in charge
                     storage::puase_ResultGame(env.clone(), result.clone().gameid, true);
                 } else {
@@ -366,7 +377,14 @@ impl betting for BettingContract {
 
         result
     }
-
+    /*
+       @dev This function assess the result of the game for users and checkers
+       @param env Environment
+       @param user Address The address of the user
+       @param bet Bet The bet of the user
+       @param game_id i128 The id of the game
+       @param desition AssessmentKey The desition of the user (approve or reject)
+    */
     fn assessResult(env: Env, user: Address, bet: Bet, game_id: i128, desition: AssessmentKey) {
         user.require_auth();
         let (exist, startTime, endTime, summiter, checkers, _) =
@@ -477,7 +495,13 @@ impl betting for BettingContract {
             }
         }
     }
-
+    /*
+       @dev This function claim the money won or the money staked for the summiter and the protocol
+       @param env Environment
+       @param user Address The address of the user
+       @param typeClaim ClaimType The type of claim (summiter, protocol, user)
+       @param setting i128 The id of the setting (only for user claim)
+    */
     fn claim(env: Env, user: Address, typeClaim: ClaimType, setting: i128) {
         user.require_auth();
         let contract_address = env.current_contract_address();
@@ -536,7 +560,7 @@ impl betting for BettingContract {
                             let user_amount = (user_share * amount_share) / 100;
                             Self::moveToken(&env, &usd, &contract_address, &user, &user_amount);
                         } else {
-                            let trust_amount = (amountBet * 30) / 100;
+                            let trust_amount = (amountBet * TRUST_TOKEN_PERCENTAGE) / 100;
                             Self::moveToken(&env, &trust, &contract_address, &user, &trust_amount);
                         }
                         storage::set_didUserWithdraw(env.clone(), user.clone(), setting.clone());
@@ -547,7 +571,7 @@ impl betting for BettingContract {
                         let user_amount = (user_share * amount_share) / 100;
                         let total = amountBet + user_amount;
                         Self::moveToken(&env, &usd, &contract_address, &user, &total);
-                        let trust_amount = (amountBet * 30) / 100;
+                        let trust_amount = (amountBet * TRUST_TOKEN_PERCENTAGE) / 100;
                         Self::moveToken(&env, &trust, &contract_address, &user, &trust_amount);
                         storage::set_didUserWithdraw(env.clone(), user.clone(), setting.clone());
                     }
@@ -562,9 +586,15 @@ impl betting for BettingContract {
             }
         }
     }
-    //set result by Supreme Court
-    fn setResult_supremCourt(env: Env, user: Address, result: ResultGame) {
-        user.require_auth();
+    /*
+       @dev This function set the result of the game when a complain has been made and the time to summit the result has passed
+       @param env Environment
+       @param result ResultGame The result of the game
+       This supreme address will be a multi sign address with the trusted respect, and reliable sources will summited the final desition
+    */
+    fn setResult_supremCourt(env: Env, result: ResultGame) {
+        let supreme = storage::get_supreme(env.clone());
+        supreme.require_auth();
         // 0 correct
         // 1 incorrect
         let mut complain = 0;
@@ -610,11 +640,11 @@ impl betting for BettingContract {
         }
         storage::set_ResultGame(env.clone(), result.clone());
     }
-    /*Fines:
-    1. users who don't participate will get the bet amount back
-    2. users who act dishonestly will lose their bet amount
-    3. summiters with wrong result will lose their stake
-     */
+    /*
+       @dev This function execute the distribution of the pools according to the rules, fines and betting
+       @param env Environment
+       @param game_id i128 The id of the game
+    */
     fn execute_distribution(env: Env, gameId: i128) {
         let complain = 2; // 2 means no complain was made
 
@@ -648,6 +678,11 @@ impl betting for BettingContract {
             );
         }
     }
+    /*
+       @dev This function set the min amount to stake
+       @param env Environment
+       @param game_id i128 The id of the game
+    */
     fn set_stakeAmount(env: Env, user: Address, amount: i128) {
         user.require_auth();
         let adminAdr: Address = storage::get_admin(env.clone());
@@ -662,6 +697,17 @@ impl betting for BettingContract {
 }
 
 impl BettingContract {
+    /*
+       @dev This  funtion make the distribution of the pools according to the rules, fines and betting
+       @param env Environment
+       @param game_id i128 The id of the game
+       @param setting i128 The id of the setting
+       @param resultBet BetKey The result of the game
+       @param complain i128 The complain made by the users
+       Complain 0 = The complain made by the users was correct
+       Complain 1 = The complain made by the users was incorrect
+       Complain 2 = No complain was made
+    */
     fn make_distribution(
         env: Env,
         game_id: i128,
@@ -688,9 +734,6 @@ impl BettingContract {
         if endTime > env.ledger().timestamp() as u32 {
             panic_with_error!(&env, BettingError::GameHasNotFinished);
         }
-        /// we start we those who did not assess the result
-        /// 1. users who don't participate and win will get the bet 50 % amount back of their bets
-        /// 2. users who don't participate and lose will lose their bet amount
         for i in 0..=2 {
             let mut bet_key: BetKey = BetKey::Team_local;
             match i {
@@ -724,10 +767,10 @@ impl BettingContract {
                             checker.clone(),
                             game_id.clone(),
                         );
-                        storage::set_history(env.clone(), checker.clone(), -100);
+                        storage::set_history(env.clone(), checker.clone(), LESS_HUNDRED_POINTS);
                     } else if resultAssessment.CheckReject.contains(&checker) {
                         s_honest.push_back(checker.clone());
-                        storage::set_history(env.clone(), checker.clone(), 100);
+                        storage::set_history(env.clone(), checker.clone(), HUNDRED_POINTS);
                     } else {
                         s_noVote.push_back(checker.clone());
                         add += storage::get_stakeAmount_user_game(
@@ -735,7 +778,7 @@ impl BettingContract {
                             checker.clone(),
                             game_id.clone(),
                         );
-                        storage::set_history(env.clone(), checker.clone(), -100);
+                        storage::set_history(env.clone(), checker.clone(), LESS_HUNDRED_POINTS);
                     }
                 }
                 amount_gain_pool +=
@@ -779,7 +822,7 @@ impl BettingContract {
                 for checker in checkers.iter() {
                     if resultAssessment.CheckApprove.contains(&checker) {
                         s_honest.push_back(checker.clone());
-                        storage::set_history(env.clone(), checker.clone(), 100);
+                        storage::set_history(env.clone(), checker.clone(), HUNDRED_POINTS);
                     } else if resultAssessment.CheckReject.contains(&checker) {
                         s_dishonest.push_back(checker.clone());
                         add += storage::get_stakeAmount_user_game(
@@ -787,7 +830,7 @@ impl BettingContract {
                             checker.clone(),
                             game_id.clone(),
                         );
-                        storage::set_history(env.clone(), checker.clone(), -100);
+                        storage::set_history(env.clone(), checker.clone(), LESS_HUNDRED_POINTS);
                     } else {
                         s_noVote.push_back(checker.clone());
                         add += storage::get_stakeAmount_user_game(
@@ -795,7 +838,7 @@ impl BettingContract {
                             checker.clone(),
                             game_id.clone(),
                         );
-                        storage::set_history(env.clone(), checker.clone(), -100);
+                        storage::set_history(env.clone(), checker.clone(), LESS_HUNDRED_POINTS);
                     }
                 }
                 amount_gain_pool +=
@@ -839,7 +882,7 @@ impl BettingContract {
                 for checker in checkers.iter() {
                     if resultAssessment.CheckApprove.contains(&checker) {
                         s_honest.push_back(checker.clone());
-                        storage::set_history(env.clone(), checker.clone(), 100);
+                        storage::set_history(env.clone(), checker.clone(), HUNDRED_POINTS);
                     } else if resultAssessment.CheckReject.contains(&checker) {
                         s_dishonest.push_back(checker.clone());
                         add += storage::get_stakeAmount_user_game(
@@ -847,7 +890,7 @@ impl BettingContract {
                             checker.clone(),
                             game_id.clone(),
                         );
-                        storage::set_history(env.clone(), checker.clone(), -100);
+                        storage::set_history(env.clone(), checker.clone(), LESS_HUNDRED_POINTS);
                     } else {
                         s_noVote.push_back(checker.clone());
                         add += storage::get_stakeAmount_user_game(
@@ -855,7 +898,7 @@ impl BettingContract {
                             checker.clone(),
                             game_id.clone(),
                         );
-                        storage::set_history(env.clone(), checker.clone(), -100);
+                        storage::set_history(env.clone(), checker.clone(), HUNDRED_POINTS);
                     }
                 }
                 for i in 0..=2 {
@@ -922,6 +965,20 @@ impl BettingContract {
         storage::set_pool_total(env.clone(), setting.clone(), amount_gain_pool);
         storage::distribution_ResultGame(env.clone(), game_id.clone());
     }
+
+    /*
+       @dev Function to determine the kind of user based on their bet and assessment
+       @param env The contract environment
+       @param user The address of the user
+       @param setting The setting ID of the bet
+       @return A tuple containing the kind of user (as an integer) and the amount bet (if applicable)
+       1: winner and honest
+       2: loser and honest
+       3: user dishonest
+       4: winner who didn't assess the result
+       5: loser who didn't assess the result
+       6: no bet
+    */
     fn what_kind_user(env: Env, user: Address, setting: i128) -> (i32, i128) {
         let betData: Bet = storage::get_bet(env.clone(), user.clone(), setting.clone());
         if betData.id == 0 {
@@ -1008,7 +1065,11 @@ impl BettingContract {
             }
         }
     }
-
+    /*
+       @dev Function to select summiter and checkers for a game
+       @param env The contract environment
+       @param game_id The ID of the game
+    */
     fn select_summiter(env: Env, game_id: i128) {
         let (exist, startTime, endTime, summiter, checkers, _) =
             storage::existBet(env.clone(), game_id.clone());
@@ -1067,6 +1128,14 @@ impl BettingContract {
         );
         BettingEvents::summiters_seleted(&env, game_id, selected_Summitters, main_summiter);
     }
+    /*
+    @dev Function to move tokens from one address to another
+    @param env The contract environment
+    @param token The address of the token contract
+    @param from The address to move tokens from
+    @param to The address to move tokens to
+    @param amount The amount of tokens to move
+     */
     fn moveToken(env: &Env, token: &Address, from: &Address, to: &Address, amount: &i128) {
         let token = token::Client::new(env, token);
         token.transfer(from, to, amount);

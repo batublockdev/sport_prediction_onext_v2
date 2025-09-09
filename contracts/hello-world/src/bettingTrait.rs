@@ -15,7 +15,7 @@ pub trait betting {
     fn summitResult(env: Env, user: Address, result: ResultGame) -> ResultGame;
     fn assessResult(env: Env, user: Address, bet: Bet, game_id: i128, desition: AssessmentKey);
     fn claim(env: Env, user: Address, typeClaim: ClaimType, setting: i128);
-    fn setResult_supremCourt(env: Env, user: Address, result: ResultGame);
+    fn setResult_supremCourt(env: Env, result: ResultGame);
     fn execute_distribution(env: Env, gameId: i128);
     fn set_stakeAmount(env: Env, user: Address, amount: i128);
 }
