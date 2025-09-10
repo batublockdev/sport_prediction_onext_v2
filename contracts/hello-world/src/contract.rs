@@ -11,8 +11,8 @@ use crate::{
         PublicBet, ResultAssessment, ResultGame,
     },
     Constants::{
-        HUNDRED_POINTS, LESS_HUNDRED_POINTS, ONE_HOUR_SECONDS, SCORE_HISTORY_WEIGHT,
-        TRUST_TOKEN_PERCENTAGE, VOTE_HISTORY_WEIGHT,
+        FIFTY_PERCENT, HUNDRED_POINTS, LESS_HUNDRED_POINTS, ONE_HOUR_SECONDS, SCORE_HISTORY_WEIGHT,
+        TEN_PERCENT, TRUST_TOKEN_PERCENTAGE, TWENTY_PERCENT, VOTE_HISTORY_WEIGHT,
     },
 };
 use soroban_sdk::{
@@ -152,7 +152,7 @@ impl betting for BettingContract {
             );
             if !privateBet.active {
                 if storage::does_bet_active(env.clone(), bet.clone()) {
-                    storage::active_private_setting(env.clone(), user.clone(), bet.clone().Setting);
+                    storage::active_private_setting(env.clone(), bet.clone().Setting, true);
                     if active == false {
                         Self::select_summiter(env.clone(), privateBet.gameid)
                     }
@@ -173,7 +173,7 @@ impl betting for BettingContract {
             storage::add_listUsuers(env.clone(), publicBet.clone().gameid, user.clone());
             if !publicBet.active {
                 if storage::does_bet_active(env.clone(), bet.clone()) {
-                    storage::active_public_setting(env.clone(), bet.clone().Setting);
+                    storage::active_public_setting(env.clone(), bet.clone().Setting, true);
                     if active == false {
                         Self::select_summiter(env.clone(), publicBet.gameid)
                     }
@@ -207,55 +207,56 @@ impl betting for BettingContract {
         let usd = storage::get_usd(env.clone());
         let trust: Address = storage::get_trust(env.clone());
         let betData: Bet = storage::get_bet(env.clone(), user.clone(), setting.clone());
-        if betData.betType == BetType::Private {
-            let privateBet: PrivateBet =
-                storage::get_PrivateBet(env.clone(), betData.clone().Setting);
-            if privateBet.clone().id == 0 {
-                panic_with_error!(&env, BettingError::SettingBetDoesNotExist);
-            }
-            if !privateBet.clone().active {
-                let (exist, startTime, endTime, _, _, active) =
-                    storage::existBet(env.clone(), privateBet.clone().gameid);
-                if startTime > env.ledger().timestamp() as u32 {
-                    Self::moveToken(&env, &usd, &contract_address, &user, &betData.amount_bet);
-                    Self::moveToken(
-                        &env,
-                        &trust,
-                        &contract_address,
-                        &user,
-                        &((betData.clone().amount_bet * 30) / 100),
-                    );
-                } else {
-                    panic_with_error!(&env, BettingError::GameHasNotStarted);
+        if betData.id == 0 {
+            panic_with_error!(&env, BettingError::NoBetHasBeenFound);
+        }
+        let (exist, startTime, endTime, _, _, active) =
+            storage::existBet(env.clone(), betData.clone().gameid);
+        if !exist {
+            panic_with_error!(&env, BettingError::GameDoesNotExist);
+        }
+        let doneBefore = storage::get_didUserWithdraw(env.clone(), user.clone(), setting.clone());
+        if doneBefore {
+            panic_with_error!(&env, BettingError::UserAlreadyClaimed);
+        }
+        if startTime < env.ledger().timestamp() as u32 {
+            if betData.betType == BetType::Private {
+                let privateBet: PrivateBet =
+                    storage::get_PrivateBet(env.clone(), betData.clone().Setting);
+                if privateBet.clone().id == 0 {
+                    panic_with_error!(&env, BettingError::SettingBetDoesNotExist);
+                }
+                if privateBet.clone().active {
+                    panic_with_error!(&env, BettingError::GameIsActive);
+                }
+            } else if betData.betType == BetType::Public {
+                let publicBet: PublicBet = storage::get_PublicBet(env.clone(), setting.clone());
+                if publicBet.clone().id == 0 {
+                    panic_with_error!(&env, BettingError::SettingBetDoesNotExist);
+                }
+                if publicBet.clone().active {
+                    panic_with_error!(&env, BettingError::GameIsActive);
                 }
             } else {
-                panic_with_error!(&env, BettingError::GameIsActive);
+                panic!("Invalid bet type");
             }
-        } else if betData.betType == BetType::Public {
-            let publicBet: PublicBet = storage::get_PublicBet(env.clone(), setting.clone());
-            if publicBet.clone().id == 0 {
-                panic_with_error!(&env, BettingError::SettingBetDoesNotExist);
-            }
-            if !publicBet.clone().active {
-                let (exist, startTime, endTime, _, _, active) =
-                    storage::existBet(env.clone(), publicBet.clone().gameid);
-                if startTime < env.ledger().timestamp() as u32 {
-                    Self::moveToken(&env, &usd, &contract_address, &user, &betData.amount_bet);
-                    Self::moveToken(
-                        &env,
-                        &trust,
-                        &contract_address,
-                        &user,
-                        &((betData.clone().amount_bet * 30) / 100),
-                    );
-                } else {
-                    panic_with_error!(&env, BettingError::GameHasNotStarted);
-                }
-            } else {
-                panic_with_error!(&env, BettingError::GameIsActive);
-            }
+            Self::moveToken(
+                &env,
+                &usd,
+                &contract_address,
+                &user,
+                &betData.clone().amount_bet,
+            );
+            Self::moveToken(
+                &env,
+                &trust,
+                &contract_address,
+                &user,
+                &((betData.clone().amount_bet * TRUST_TOKEN_PERCENTAGE) / 100),
+            );
+            storage::set_didUserWithdraw(env.clone(), user.clone(), setting.clone());
         } else {
-            panic!("Invalid bet type");
+            panic_with_error!(&env, BettingError::NothingToClaim);
         }
     }
     /*
@@ -618,25 +619,33 @@ impl betting for BettingContract {
         }
         let listedPrivateBet: Vec<(i128)> =
             storage::get_privateSettingList(env.clone(), result.clone().gameid);
-        Self::make_distribution(
-            env.clone(),
-            result.clone().gameid,
-            result.clone().gameid,
-            result.clone().result,
-            complain,
-        );
+        if result.result == BetKey::Cancel {
+            storage::active_public_setting(env.clone(), result.clone().gameid, false);
+        } else {
+            Self::make_distribution(
+                env.clone(),
+                result.clone().gameid,
+                result.clone().gameid,
+                result.clone().result,
+                complain,
+            );
+        }
         for setting in listedPrivateBet.iter() {
             let privateBet: PrivateBet = storage::get_PrivateBet(env.clone(), setting.clone());
             if privateBet.active == false {
                 continue;
             }
-            Self::make_distribution(
-                env.clone(),
-                privateBet.clone().gameid,
-                setting.clone(),
-                result.clone().result,
-                complain,
-            );
+            if result.result == BetKey::Cancel {
+                storage::active_private_setting(env.clone(), setting.clone(), false);
+            } else {
+                Self::make_distribution(
+                    env.clone(),
+                    privateBet.clone().gameid,
+                    setting.clone(),
+                    result.clone().result,
+                    complain,
+                );
+            }
         }
         storage::set_ResultGame(env.clone(), result.clone());
     }
@@ -647,35 +656,43 @@ impl betting for BettingContract {
     */
     fn execute_distribution(env: Env, gameId: i128) {
         let complain = 2; // 2 means no complain was made
-
         let result: ResultGame = storage::get_ResultGame(env.clone(), gameId.clone());
+        let listedPrivateBet: Vec<(i128)> =
+            storage::get_privateSettingList(env.clone(), result.clone().gameid);
         if result.pause == true {
             panic_with_error!(&env, BettingError::GameHasBeenPaused);
         }
         if result.clone().distribution_executed {
             panic_with_error!(&env, BettingError::GameHasAlreadyBeenExecuted);
         }
-        let listedPrivateBet: Vec<(i128)> =
-            storage::get_privateSettingList(env.clone(), result.clone().gameid);
-        Self::make_distribution(
-            env.clone(),
-            result.clone().gameid,
-            result.clone().gameid,
-            result.clone().result,
-            complain,
-        );
+        if result.result == BetKey::Cancel {
+            storage::active_public_setting(env.clone(), gameId, false);
+        } else {
+            Self::make_distribution(
+                env.clone(),
+                result.clone().gameid,
+                result.clone().gameid,
+                result.clone().result,
+                complain,
+            );
+        }
+
         for setting in listedPrivateBet.iter() {
             let privateBet: PrivateBet = storage::get_PrivateBet(env.clone(), setting.clone());
             if privateBet.active == false {
                 continue;
             }
-            Self::make_distribution(
-                env.clone(),
-                privateBet.clone().gameid,
-                setting.clone(),
-                result.clone().result,
-                complain,
-            );
+            if result.result == BetKey::Cancel {
+                storage::active_private_setting(env.clone(), setting.clone(), false);
+            } else {
+                Self::make_distribution(
+                    env.clone(),
+                    privateBet.clone().gameid,
+                    setting.clone(),
+                    result.clone().result,
+                    complain,
+                );
+            }
         }
     }
     /*
@@ -937,15 +954,15 @@ impl BettingContract {
             }
         }
 
-        let mut summiter_retribution = (amount_gain_pool * 20) / 100;
-        let mut protocol_retribution = (amount_gain_pool * 10) / 100;
+        let mut summiter_retribution = (amount_gain_pool * TWENTY_PERCENT) / 100;
+        let mut protocol_retribution = (amount_gain_pool * TEN_PERCENT) / 100;
         amount_gain_pool -= summiter_retribution;
         amount_gain_pool -= protocol_retribution;
         summiter_retribution += add;
         if winner_pool == 0 {
             if losers_honest_pool == 0 {
-                summiter_retribution = (amount_gain_pool * 50) / 100;
-                protocol_retribution = (amount_gain_pool * 50) / 100;
+                summiter_retribution = (amount_gain_pool * FIFTY_PERCENT) / 100;
+                protocol_retribution = (amount_gain_pool * FIFTY_PERCENT) / 100;
                 amount_gain_pool -= summiter_retribution;
                 amount_gain_pool -= protocol_retribution;
             }
@@ -1078,7 +1095,7 @@ impl BettingContract {
         }
         let mut leaderboard: Vec<(Address, i128)> = storage::get_leaderboard(env.clone());
         let adminAdr: Address = storage::get_admin(env.clone());
-        let mut main_summiter: Address = adminAdr;
+        let mut main_summiter: Address = adminAdr.clone();
         let mut selected_Summitters: Vec<Address> = Vec::new(&env);
 
         // Limit to top 5

@@ -4,7 +4,7 @@ use crate::types::{
 };
 use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Vec};
 const ADMIN_KEY: Symbol = Symbol::short("ADMIN");
-const SUPREME_KEY: Symbol = Symbol::short("ADMIN");
+const SUPREME_KEY: Symbol = Symbol::short("SUPREME");
 const TOKEN_USD_KEY: Symbol = Symbol::short("TOKEN_USD");
 const TOKEN_TRUST_KEY: Symbol = Symbol::short("TK_TRUST");
 const LEADERBOARD: Symbol = symbol_short!("LB");
@@ -208,7 +208,7 @@ pub fn does_bet_active(env: Env, bet: Bet) -> bool {
         return false;
     }
 }
-pub fn active_private_setting(env: Env, user: Address, setting: i128) {
+pub fn active_private_setting(env: Env, setting: i128, active: bool) {
     env.storage().persistent().update(
         &DataKey::SetPrivateBet(setting),
         |old: Option<PrivateBet>| {
@@ -220,12 +220,12 @@ pub fn active_private_setting(env: Env, user: Address, setting: i128) {
                 amount_bet_min: 0,
                 users_invated: Vec::new(&env),
             });
-            res.active = true;
+            res.active = active;
             res
         },
     );
 }
-pub fn active_public_setting(env: Env, setting: i128) {
+pub fn active_public_setting(env: Env, setting: i128, active: bool) {
     env.storage()
         .persistent()
         .update(&DataKey::SetPublicBet(setting), |old: Option<PublicBet>| {
@@ -235,7 +235,7 @@ pub fn active_public_setting(env: Env, setting: i128) {
                 active: false,
                 description: String::from_slice(&env, "No public bet found"),
             });
-            res.active = true;
+            res.active = active;
             res
         });
 }

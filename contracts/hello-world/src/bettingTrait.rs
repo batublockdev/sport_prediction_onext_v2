@@ -6,7 +6,13 @@ use crate::types::{AssessmentKey, Bet, BetKey, ClaimType, Game, PrivateBet, Resu
 
 #[contractclient(name = "BettingClient")]
 pub trait betting {
-    fn __constructor(env: Env, admin: Address, token_usd: Address, token_trust: Address);
+    fn __constructor(
+        env: Env,
+        admin: Address,
+        token_usd: Address,
+        token_trust: Address,
+        supreme_court: Address,
+    );
     fn request_result_summiter(env: Env, user: Address, stakeAmount: i128) -> bool;
     fn bet(env: Env, user: Address, bet: Bet);
     fn claim_money_noactive(env: Env, user: Address, setting: i128);

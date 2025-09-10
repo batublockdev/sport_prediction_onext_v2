@@ -76,12 +76,6 @@ pub struct Bet {
     pub bet: BetKey,
     pub amount_bet: i128,
 }
-#[contracttype]
-#[derive(Clone)]
-pub struct Signature {
-    pub public_key: BytesN<32>,
-    pub signature: BytesN<64>,
-}
 
 #[derive(Clone)]
 #[contracttype]
@@ -121,6 +115,7 @@ pub enum BetKey {
     Team_local,
     Team_away,
     Draw,
+    Cancel,
 }
 #[derive(Clone, PartialEq, Eq)]
 #[contracttype]
