@@ -216,6 +216,7 @@ pub fn active_private_setting(env: Env, setting: i128, active: bool) {
                 id: 0,
                 gameid: 0,
                 active: false,
+                settingAdmin: get_dummyusser(&env),
                 description: String::from_slice(&env, "No private bet found"),
                 amount_bet_min: 0,
                 users_invated: Vec::new(&env),
@@ -260,6 +261,7 @@ pub fn get_PrivateBet(env: Env, setting: i128) -> PrivateBet {
             id: 0,
             gameid: 0,
             active: false,
+            settingAdmin: get_dummyusser(&env),
             description: String::from_slice(&env, "No private bet found"),
             amount_bet_min: 0,
             users_invated: Vec::new(&env),
@@ -326,6 +328,9 @@ pub fn add_Fine(env: Env, gameid: i128, finex: i128) {
     env.storage()
         .persistent()
         .set(&DataKey::Fine(gameid), &total_fine);
+}
+pub fn zero_Fine(env: Env, gameid: i128) {
+    env.storage().persistent().set(&DataKey::Fine(gameid), &0);
 }
 pub fn get_Fine(env: Env, gameid: i128) -> i128 {
     let fine = env
@@ -561,6 +566,26 @@ pub fn existBet(env: Env, game_id: i128) -> (bool, u32, u32, Address, Vec<Addres
         receiveGame.Checker,
         receiveGame.active,
     )
+}
+pub fn add_total_bet(env: Env, game_id: i128, Amount: i128) {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::TotalBet(game_id))
+        .unwrap_or(0);
+    let Amountx = total_amount + Amount;
+    env.storage()
+        .persistent()
+        .set(&DataKey::TotalBet(game_id), &Amountx);
+}
+
+pub fn get_total_bet(env: Env, game_id: i128) -> i128 {
+    let total_amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::TotalBet(game_id))
+        .unwrap_or(0);
+    total_amount
 }
 pub fn add_not_assesed_yet(env: Env, game_id: i128, Amount: i128, bet: BetKey) {
     let total_amount: i128 = env

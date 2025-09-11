@@ -1525,7 +1525,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "1400"
+                  "i128": "200"
                 }
               }
             },
@@ -1616,6 +1616,51 @@
                 "durability": "persistent",
                 "val": {
                   "i128": "2"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          0
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Fine"
+                },
+                {
+                  "i128": "1"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Fine"
+                    },
+                    {
+                      "i128": "1"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "i32": 0
                 }
               }
             },
@@ -2481,6 +2526,51 @@
             "key": {
               "vec": [
                 {
+                  "symbol": "TotalBet"
+                },
+                {
+                  "i128": "1"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "TotalBet"
+                    },
+                    {
+                      "i128": "1"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "i128": "2000"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          4095
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+            "key": {
+              "vec": [
+                {
                   "symbol": "UserWithdraw"
                 },
                 {
@@ -2672,7 +2762,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "600"
+                  "i128": "1200"
                 }
               }
             },
@@ -2998,7 +3088,7 @@
                         "symbol": "amount"
                       },
                       "val": {
-                        "i128": "100000600"
+                        "i128": "100001200"
                       }
                     },
                     {
@@ -3068,7 +3158,7 @@
                         "symbol": "amount"
                       },
                       "val": {
-                        "i128": "2400"
+                        "i128": "1200"
                       }
                     },
                     {
@@ -3208,7 +3298,7 @@
                         "symbol": "amount"
                       },
                       "val": {
-                        "i128": "99999000"
+                        "i128": "99999600"
                       }
                     },
                     {

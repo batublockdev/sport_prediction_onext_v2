@@ -15,9 +15,10 @@ pub trait betting {
     );
     fn request_result_summiter(env: Env, user: Address, stakeAmount: i128) -> bool;
     fn bet(env: Env, user: Address, bet: Bet);
-    fn claim_money_noactive(env: Env, user: Address, setting: i128);
+    fn claim_refund(env: Env, user: Address, setting: i128);
     fn set_game(env: Env, game: Game, signature: BytesN<64>, pub_key: BytesN<32>);
     fn set_private_bet(env: Env, user: Address, privateData: PrivateBet, game_id: i128);
+    fn add_user_privateBet(env: Env, setting: i128, game: i128, newUser: Address);
     fn summitResult(env: Env, user: Address, result: ResultGame) -> ResultGame;
     fn assessResult(env: Env, user: Address, bet: Bet, game_id: i128, desition: AssessmentKey);
     fn claim(env: Env, user: Address, typeClaim: ClaimType, setting: i128);

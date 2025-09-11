@@ -41,4 +41,5 @@ pub enum BettingError {
     NotAdmin = 222,
     NotEnoughStake = 223,
     UnknownSigner = 224,
+    GameResultAlreadySet = 225,
 }

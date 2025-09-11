@@ -48,6 +48,7 @@ pub struct PrivateBet {
     pub id: i128,
     pub gameid: i128,
     pub active: bool,
+    pub settingAdmin: Address,
     pub description: String,
     pub amount_bet_min: i128,
     pub users_invated: Vec<Address>,
@@ -81,6 +82,7 @@ pub struct Bet {
 #[contracttype]
 pub enum DataKey {
     Game(i128),
+    TotalBet(i128),
     Signer(BytesN<32>),
     Result(i128),
     ClaimWinner(Address),

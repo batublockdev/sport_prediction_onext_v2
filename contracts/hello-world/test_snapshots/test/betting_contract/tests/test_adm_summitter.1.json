@@ -2427,7 +2427,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "1800"
+                  "i128": "300"
                 }
               }
             },
@@ -2608,6 +2608,96 @@
                 "durability": "persistent",
                 "val": {
                   "i128": "2"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          0
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Fine"
+                },
+                {
+                  "i128": "1"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Fine"
+                    },
+                    {
+                      "i128": "1"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "i32": 0
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          0
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Fine"
+                },
+                {
+                  "i128": "31"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Fine"
+                    },
+                    {
+                      "i128": "31"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "i32": 0
                 }
               }
             },
@@ -4043,6 +4133,96 @@
             "key": {
               "vec": [
                 {
+                  "symbol": "TotalBet"
+                },
+                {
+                  "i128": "1"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "TotalBet"
+                    },
+                    {
+                      "i128": "1"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "i128": "2000"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          4095
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "TotalBet"
+                },
+                {
+                  "i128": "31"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "TotalBet"
+                    },
+                    {
+                      "i128": "31"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "i128": "2000"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          0
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+            "key": {
+              "vec": [
+                {
                   "symbol": "UserWithdraw"
                 },
                 {
@@ -4396,7 +4576,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "600"
+                  "i128": "1200"
                 }
               }
             },
@@ -4441,7 +4621,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "600"
+                  "i128": "900"
                 }
               }
             },
@@ -4915,7 +5095,7 @@
                         "symbol": "amount"
                       },
                       "val": {
-                        "i128": "100001200"
+                        "i128": "100002100"
                       }
                     },
                     {
@@ -4985,7 +5165,7 @@
                         "symbol": "amount"
                       },
                       "val": {
-                        "i128": "2800"
+                        "i128": "1300"
                       }
                     },
                     {
@@ -5125,7 +5305,7 @@
                         "symbol": "amount"
                       },
                       "val": {
-                        "i128": "99999000"
+                        "i128": "99999600"
                       }
                     },
                     {

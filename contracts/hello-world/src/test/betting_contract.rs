@@ -255,7 +255,7 @@ mod tests {
         let initial_usd_balance = usd_client.balance(&user);
         let initial_trust_balance = trust_client.balance(&user);
 
-        client.claim_money_noactive(&user, &game_id);
+        client.claim_refund(&user, &game_id);
 
         // Verify token refunds
         assert_eq!(usd_client.balance(&user), initial_usd_balance + 1000);
@@ -822,7 +822,7 @@ mod tests {
         client.execute_distribution(&game_id);
         // Claim as winner
 
-        client.claim_money_noactive(&user, &game_id);
+        client.claim_refund(&user, &game_id);
 
         // Verify token transfers (winner gets bet + share of pool)
         assert_eq!(token_usd_client.balance(&user), initial_usd_balance); // Trust tokens returned
@@ -1166,6 +1166,7 @@ mod tests {
             id: 11,
             gameid: game_id,
             active: false,
+            settingAdmin: user2.clone(),
             description: String::from_str(&env, "Private Bet 1"),
             amount_bet_min: 500,
             users_invated: vec![&env, user.clone(), user2.clone()],
@@ -1208,14 +1209,7 @@ mod tests {
             description: String::from_str(&env, "Final Score 2-1"),
             distribution_executed: false,
         };
-        let result2 = ResultGame {
-            id: 1,
-            gameid: game_id,
-            result: BetKey::Team_away,
-            pause: false,
-            description: String::from_str(&env, "Final Score 2-1"),
-            distribution_executed: false,
-        };
+
         client.summitResult(&summiter2, &result);
 
         client.assessResult(&user2, &betx, &game_id, &AssessmentKey::approve);
@@ -1288,6 +1282,7 @@ mod tests {
             id: 11,
             gameid: game_id,
             active: false,
+            settingAdmin: user2.clone(),
             description: String::from_str(&env, "Private Bet 1"),
             amount_bet_min: 500,
             users_invated: vec![&env, user.clone(), user2.clone()],
