@@ -83,7 +83,6 @@ pub struct Bet {
 pub enum DataKey {
     Game(i128),
     TotalBet(i128),
-    Signer(BytesN<32>),
     Result(i128),
     ClaimWinner(Address),
     ClaimSummiter(Address),

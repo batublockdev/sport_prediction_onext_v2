@@ -618,64 +618,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 },
                 {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "Setting"
-                      },
-                      "val": {
-                        "i128": "1"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "amount_bet"
-                      },
-                      "val": {
-                        "i128": "1000"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "bet"
-                      },
-                      "val": {
-                        "vec": [
-                          {
-                            "symbol": "Team_local"
-                          }
-                        ]
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "betType"
-                      },
-                      "val": {
-                        "vec": [
-                          {
-                            "symbol": "Public"
-                          }
-                        ]
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "gameid"
-                      },
-                      "val": {
-                        "i128": "1"
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "id"
-                      },
-                      "val": {
-                        "i128": "1"
-                      }
-                    }
-                  ]
+                  "i128": "1"
                 },
                 {
                   "i128": "1"

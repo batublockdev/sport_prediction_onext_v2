@@ -458,7 +458,7 @@ mod tests {
 
         client.summitResult(&summiter2, &result);
 
-        client.assessResult(&user, &bet, &game_id, &AssessmentKey::approve);
+        client.assessResult(&user, &game_id, &game_id, &AssessmentKey::approve);
     }
     #[test]
     fn test_adm_summitter() {
@@ -547,7 +547,7 @@ mod tests {
 
         client.summitResult(&summiter2, &result);
 
-        client.assessResult(&user, &bet, &game_id, &AssessmentKey::approve);
+        client.assessResult(&user, &game_id, &game_id, &AssessmentKey::approve);
 
         // Execute distribution
         client.execute_distribution(&game_id);
@@ -620,7 +620,7 @@ mod tests {
 
         client.summitResult(&admin, &result);
 
-        client.assessResult(&user, &betxz, &game_idx, &AssessmentKey::approve);
+        client.assessResult(&user, &game_idx, &game_idx, &AssessmentKey::approve);
 
         // Execute distribution
         client.execute_distribution(&game_idx);
@@ -716,7 +716,7 @@ mod tests {
 
         client.summitResult(&summiter2, &result);
 
-        client.assessResult(&user, &bet, &game_id, &AssessmentKey::approve);
+        client.assessResult(&user, &game_id, &game_id, &AssessmentKey::approve);
 
         // Execute distribution
         client.execute_distribution(&game_id);
@@ -816,7 +816,7 @@ mod tests {
 
         client.summitResult(&summiter2, &result);
 
-        client.assessResult(&user, &bet, &game_id, &AssessmentKey::approve);
+        client.assessResult(&user, &game_id, &game_id, &AssessmentKey::approve);
 
         // Execute distribution
         client.execute_distribution(&game_id);
@@ -914,7 +914,7 @@ mod tests {
 
         client.summitResult(&summiter2, &result);
 
-        client.assessResult(&user, &bet, &game_id, &AssessmentKey::reject);
+        client.assessResult(&user, &game_id, &game_id, &AssessmentKey::reject);
         client.execute_distribution(&game_id);
     }
     #[test]
@@ -1008,7 +1008,7 @@ mod tests {
         };
         client.summitResult(&summiter2, &result);
 
-        client.assessResult(&user, &bet, &game_id, &AssessmentKey::reject);
+        client.assessResult(&user, &game_id, &game_id, &AssessmentKey::reject);
         client.setResult_supremCourt(&result2);
     }
     #[test]
@@ -1104,7 +1104,7 @@ mod tests {
         };
         client.summitResult(&summiter2, &result);
 
-        client.assessResult(&user, &bet, &game_id, &AssessmentKey::reject);
+        client.assessResult(&user, &game_id, &game_id, &AssessmentKey::reject);
         client.setResult_supremCourt(&result2);
         // Execute distribution
 
@@ -1212,8 +1212,8 @@ mod tests {
 
         client.summitResult(&summiter2, &result);
 
-        client.assessResult(&user2, &betx, &game_id, &AssessmentKey::approve);
-        client.assessResult(&user, &bet, &game_id, &AssessmentKey::approve);
+        client.assessResult(&user2, &11, &game_id, &AssessmentKey::approve);
+        client.assessResult(&user, &11, &game_id, &AssessmentKey::approve);
 
         //client.assessResult(&user, &bet, &game_id, &AssessmentKey::approve);
         client.execute_distribution(&game_id);
@@ -1221,8 +1221,26 @@ mod tests {
         // Execute distribution
 
         client.claim(&user, &ClaimType::User, &11);
+        //client.claim(&user2, &ClaimType::User, &11);
+        client.claim(&summiter, &ClaimType::Summiter, &game_id);
+        client.claim(&summiter2, &ClaimType::Summiter, &game_id);
+        client.claim(&admin, &ClaimType::Protocol, &game_id);
 
-        client.claim(&user2, &ClaimType::User, &11);
+        // Verify token transfers (winner gets bet + share of pool)
+        std::println!("User balance final {:?}", token_usd_client.balance(&user));
+        std::println!("User2 balance final {:?}", token_usd_client.balance(&user2));
+        std::println!(
+            "summiter balance initial {:?}",
+            token_usd_client.balance(&summiter)
+        );
+        std::println!(
+            "summiter2 balance initial {:?}",
+            token_usd_client.balance(&summiter2)
+        );
+        std::println!(
+            "admin balance initial {:?}",
+            token_usd_client.balance(&admin)
+        );
 
         // Verify token transfers (winner gets bet + share of pool)
         assert!(token_usd_client.balance(&user) > initial_usd_balance);
@@ -1272,8 +1290,18 @@ mod tests {
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
-        adm_usd.mint(&summiter, &100_000_000);
-        adm_usd.mint(&summiter2, &100_000_000);
+        std::println!("summiter address: {:?}", summiter);
+        std::println!("summiter2 address: {:?}", summiter2);
+        adm_usd.mint(&summiter, &1000);
+        adm_usd.mint(&summiter2, &1000);
+        std::println!(
+            "summiter balance initial {:?}",
+            token_usd_client.balance(&summiter)
+        );
+        std::println!(
+            "summiter2 balance initial {:?}",
+            token_usd_client.balance(&summiter2)
+        );
         client.request_result_summiter(&summiter, &1000);
         client.request_result_summiter(&summiter2, &1000);
         let user2 = Address::generate(&env);
@@ -1300,6 +1328,7 @@ mod tests {
 
         let initial_usd_balance = token_usd_client.balance(&user);
         let initial_trust_balance = token_trust_client.balance(&user);
+        std::println!("User1 honest balance initial {:?}", initial_usd_balance);
         client.bet(&user, &bet);
         adm_usd.mint(&user2, &100_000_000);
         adm_trust.mint(&user2, &100_000_000);
@@ -1312,6 +1341,9 @@ mod tests {
             betType: BetType::Private,
             gameid: game_id,
         };
+        let initial_usd_balance = token_usd_client.balance(&user2);
+        std::println!("User2 novote balance initial {:?}", initial_usd_balance);
+
         client.bet(&user2, &betx);
         // Set ledger timestamp after game end
         set_ledger_timestamp(&env, 2500);
@@ -1334,13 +1366,33 @@ mod tests {
         };
         client.summitResult(&summiter2, &result);
 
-        client.assessResult(&user, &bet, &game_id, &AssessmentKey::reject);
+        client.assessResult(&user, &11, &game_id, &AssessmentKey::reject);
+        client.assessResult(&summiter, &0, &game_id, &AssessmentKey::reject);
+
         client.setResult_supremCourt(&result2);
         // Execute distribution
 
         client.claim(&user, &ClaimType::User, &11);
+        //client.claim(&user2, &ClaimType::User, &11);
+        client.claim(&summiter, &ClaimType::Summiter, &game_id);
+        client.claim(&summiter2, &ClaimType::Summiter, &game_id);
+        client.claim(&admin, &ClaimType::Protocol, &game_id);
 
         // Verify token transfers (winner gets bet + share of pool)
+        std::println!("User balance final {:?}", token_usd_client.balance(&user));
+        std::println!("User2 balance final {:?}", token_usd_client.balance(&user2));
+        std::println!(
+            "summiter balance initial {:?}",
+            token_usd_client.balance(&summiter)
+        );
+        std::println!(
+            "summiter2 balance initial {:?}",
+            token_usd_client.balance(&summiter2)
+        );
+        std::println!(
+            "admin balance initial {:?}",
+            token_usd_client.balance(&admin)
+        );
         assert!(token_usd_client.balance(&user) > initial_usd_balance);
         assert_eq!(token_trust_client.balance(&user), initial_trust_balance); // Trust tokens returned
     }

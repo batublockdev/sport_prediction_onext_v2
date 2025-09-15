@@ -1,5 +1,4 @@
 #![no_std]
-use core::{f32::consts::E, panic, result};
 
 use crate::{
     bettingTrait::betting,
@@ -142,7 +141,6 @@ impl betting for BettingContract {
             if bet.clone().amount_bet < privateBet.clone().amount_bet_min {
                 panic_with_error!(&env, BettingError::PrivateBet_NotEnoughToBet);
             }
-            storage::add_privateSettingList(env.clone(), bet.clone().gameid, bet.clone().Setting);
             storage::add_bet(env.clone(), user.clone(), bet.clone());
             storage::add_not_assesed_yet(
                 env.clone(),
@@ -210,7 +208,6 @@ impl betting for BettingContract {
         let usd = storage::get_usd(env.clone());
         let trust: Address = storage::get_trust(env.clone());
         let mut amountUsd = 0;
-        let mut amountTrust = 0;
         let mut totalBet = 0;
         let betData: Bet = storage::get_bet(env.clone(), user.clone(), setting.clone());
         let receivedResult: ResultGame =
@@ -341,6 +338,7 @@ impl betting for BettingContract {
             panic_with_error!(&env, BettingError::InvalidInputError);
         }
         storage::set_privateSetting(env.clone(), privateData.clone());
+        storage::add_privateSettingList(env.clone(), game_id.clone(), privateData.id);
     }
     /*
     @dev This function add a user to a private bet setting
@@ -461,7 +459,13 @@ impl betting for BettingContract {
        @param game_id i128 The id of the game
        @param desition AssessmentKey The desition of the user (approve or reject)
     */
-    fn assessResult(env: Env, user: Address, bet: Bet, game_id: i128, desition: AssessmentKey) {
+    fn assessResult(
+        env: Env,
+        user: Address,
+        setting: i128,
+        game_id: i128,
+        desition: AssessmentKey,
+    ) {
         user.require_auth();
         let (exist, startTime, endTime, summiter, checkers, _) =
             storage::existBet(env.clone(), game_id.clone());
@@ -481,10 +485,11 @@ impl betting for BettingContract {
         }
         let mut resultAssessment: ResultAssessment =
             storage::get_ResultAssessment(env.clone(), game_id.clone());
+
         if !checkers.contains(&user) {
-            let betResult: Bet = storage::get_Bet(env.clone(), user.clone(), bet.clone().Setting);
+            let betResult: Bet = storage::get_Bet(env.clone(), user.clone(), setting.clone());
             if betResult.id == 0 {
-                panic_with_error!(&env, BettingError::UserCannotVote);
+                panic_with_error!(&env, BettingError::BetNotFound);
             }
             if resultAssessment.UsersApprove.contains(&user)
                 || resultAssessment.UsersReject.contains(&user)
@@ -593,6 +598,7 @@ impl betting for BettingContract {
             ClaimType::Protocol => {
                 adminAdr.require_auth();
                 let money: i128 = storage::get_ClaimProtocol(env.clone());
+
                 Self::moveToken(&env, &usd, &contract_address, &adminAdr, &money);
                 storage::zero_ClaimProtocol(env.clone());
             }
@@ -675,6 +681,9 @@ impl betting for BettingContract {
         // 1 incorrect
         let mut complain = 0;
         let xresult: ResultGame = storage::get_ResultGame(env.clone(), result.clone().gameid);
+        if xresult.clone().distribution_executed {
+            panic_with_error!(&env, BettingError::GameHasAlreadyBeenExecuted);
+        }
         if xresult.pause == false {
             panic_with_error!(&env, BettingError::GameHasNotBeenPaused);
         }
@@ -694,34 +703,42 @@ impl betting for BettingContract {
         }
         let listedPrivateBet: Vec<(i128)> =
             storage::get_privateSettingList(env.clone(), result.clone().gameid);
+
         if result.result == BetKey::Cancel {
             storage::active_public_setting(env.clone(), result.clone().gameid, false);
         } else {
-            Self::make_distribution(
-                env.clone(),
-                result.clone().gameid,
-                result.clone().gameid,
-                result.clone().result,
-                complain,
-            );
-        }
-        for setting in listedPrivateBet.iter() {
-            let privateBet: PrivateBet = storage::get_PrivateBet(env.clone(), setting.clone());
-            if privateBet.active == false {
-                continue;
-            }
-            if result.result == BetKey::Cancel {
-                storage::active_private_setting(env.clone(), setting.clone(), false);
-            } else {
+            let publicBet: PublicBet = storage::get_PublicBet(env.clone(), result.clone().gameid);
+            if publicBet.active != false {
                 Self::make_distribution(
                     env.clone(),
-                    privateBet.clone().gameid,
-                    setting.clone(),
+                    result.clone().gameid,
+                    result.clone().gameid,
                     result.clone().result,
                     complain,
                 );
             }
         }
+        if listedPrivateBet.len() != 0 {
+            for setting in listedPrivateBet.iter() {
+                let privateBet: PrivateBet = storage::get_PrivateBet(env.clone(), setting.clone());
+                if privateBet.active == false {
+                    continue;
+                }
+
+                if result.result == BetKey::Cancel {
+                    storage::active_private_setting(env.clone(), setting.clone(), false);
+                } else {
+                    Self::make_distribution(
+                        env.clone(),
+                        privateBet.clone().gameid,
+                        setting.clone(),
+                        result.clone().result,
+                        complain,
+                    );
+                }
+            }
+        }
+
         storage::set_ResultGame(env.clone(), result.clone());
     }
     /*
@@ -743,13 +760,16 @@ impl betting for BettingContract {
         if result.result == BetKey::Cancel {
             storage::active_public_setting(env.clone(), gameId, false);
         } else {
-            Self::make_distribution(
-                env.clone(),
-                result.clone().gameid,
-                result.clone().gameid,
-                result.clone().result,
-                complain,
-            );
+            let publicBet: PublicBet = storage::get_PublicBet(env.clone(), gameId);
+            if publicBet.active != false {
+                /* Self::make_distribution(
+                    env.clone(),
+                    result.clone().gameid,
+                    result.clone().gameid,
+                    result.clone().result,
+                    complain,
+                );*/
+            }
         }
 
         for setting in listedPrivateBet.iter() {
@@ -807,6 +827,7 @@ impl BettingContract {
         resultBet: BetKey,
         complain: i128,
     ) {
+        let mut result: ResultGame = storage::get_ResultGame(env.clone(), game_id.clone());
         let mut amount_gain_pool: i128 = 0;
         let mut losers_honest_pool: i128 = 0;
         let mut winner_pool: i128 = 0;
@@ -816,6 +837,7 @@ impl BettingContract {
         let mut s_noVote: Vec<Address> = Vec::new(&env);
         let mut add = 0;
         let admin = storage::get_admin(env.clone());
+
         let mut resultAssessment: ResultAssessment =
             storage::get_ResultAssessment(env.clone(), game_id.clone());
 
@@ -1045,7 +1067,7 @@ impl BettingContract {
         }
         amount_gain_pool += add;
         amount_gain_pool += storage::get_Fine(env.clone(), game_id.clone());
-        storage::zero_Fine(env.clone(), game_id.clone());
+        //storage::zero_Fine(env.clone(), game_id.clone());
         let mut summiter_retribution = 0;
         let mut protocol_retribution = (amount_gain_pool * TEN_PERCENT) / 100;
         if winner_pool == 0 {
@@ -1064,19 +1086,26 @@ impl BettingContract {
             if summiter != admin {
                 summiter_retribution = (amount_gain_pool * TWENTY_PERCENT) / 100;
                 for honest in s_honest.iter() {
-                    let amount = summiter_retribution / s_honest.len() as i128;
+                    let mut amount = summiter_retribution / s_honest.len() as i128;
+                    amount += storage::get_stakeAmount_user_game(
+                        env.clone(),
+                        honest.clone(),
+                        game_id.clone(),
+                    );
                     storage::add_ClaimSummiter(env.clone(), honest.clone(), amount);
                 }
             }
         }
-        amount_gain_pool -= summiter_retribution;
         amount_gain_pool -= protocol_retribution;
+        amount_gain_pool -= summiter_retribution;
         storage::add_ClaimProtocol(env.clone(), protocol_retribution);
         storage::save_complain(env.clone(), game_id.clone(), complain);
         storage::save_winnerPool(env.clone(), setting.clone(), winner_pool);
         storage::save_loserPool(env.clone(), setting.clone(), losers_honest_pool);
         storage::set_pool_total(env.clone(), setting.clone(), amount_gain_pool);
         storage::distribution_ResultGame(env.clone(), game_id.clone());
+        result.distribution_executed = true;
+        storage::set_ResultGame(env.clone(), result.clone());
     }
 
     /*
@@ -1197,28 +1226,29 @@ impl BettingContract {
         // Limit to top 5
         if leaderboard.len() != 0 {
             let mut top = Vec::new(&env);
-            for i in 0..9 {
-                if let Some((addr, score)) = leaderboard.get(i) {
-                    if score == 0 {
-                        break;
+            if leaderboard.len() < 10 {
+                top = leaderboard.clone();
+            } else {
+                for i in 0..9 {
+                    if let Some((addr, score)) = leaderboard.get(i) {
+                        if score == 0 {
+                            break;
+                        }
+                        top.push_back((addr.clone(), score));
                     }
-                    top.push_back((addr.clone(), score));
                 }
             }
 
             let sequence = env.ledger().sequence();
             let timestamp = env.ledger().timestamp() as u32;
             let mut rng = (sequence + timestamp) % (top.len() as u32);
-            let mut selected = Vec::new(&env);
             for k in 0..4 {
                 let pick = rng % top.len();
                 let (addr, score) = top.get(pick).unwrap();
-                selected.push_back((addr.clone(), score));
                 if k == 0 {
                     main_summiter = addr.clone();
                     storage::set_stakeAmount_user_game(env.clone(), addr.clone(), game_id.clone());
-                }
-                if k > 0 {
+                } else {
                     selected_Summitters.push_back(addr.clone());
                     storage::set_stakeAmount_user_game(env.clone(), addr.clone(), game_id.clone());
                 }

@@ -216,7 +216,10 @@ pub fn active_private_setting(env: Env, setting: i128, active: bool) {
                 id: 0,
                 gameid: 0,
                 active: false,
-                settingAdmin: get_dummyusser(&env),
+                settingAdmin: Address::from_string(&String::from_str(
+                    &env,
+                    "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+                )),
                 description: String::from_slice(&env, "No private bet found"),
                 amount_bet_min: 0,
                 users_invated: Vec::new(&env),
@@ -261,7 +264,10 @@ pub fn get_PrivateBet(env: Env, setting: i128) -> PrivateBet {
             id: 0,
             gameid: 0,
             active: false,
-            settingAdmin: get_dummyusser(&env),
+            settingAdmin: Address::from_string(&String::from_str(
+                &env,
+                "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+            )),
             description: String::from_slice(&env, "No private bet found"),
             amount_bet_min: 0,
             users_invated: Vec::new(&env),
@@ -330,7 +336,10 @@ pub fn add_Fine(env: Env, gameid: i128, finex: i128) {
         .set(&DataKey::Fine(gameid), &total_fine);
 }
 pub fn zero_Fine(env: Env, gameid: i128) {
-    env.storage().persistent().set(&DataKey::Fine(gameid), &0);
+    let zero = 0;
+    env.storage()
+        .persistent()
+        .set(&DataKey::Fine(gameid), &zero);
 }
 pub fn get_Fine(env: Env, gameid: i128) -> i128 {
     let fine = env
@@ -412,36 +421,13 @@ pub fn get_Bet(env: Env, user: Address, setting: i128) -> Bet {
             amount_bet: 0,
         })
 }
-pub fn get_ClaimWinner(env: Env, user: Address) -> i128 {
-    let amount: i128 = env
-        .storage()
-        .persistent()
-        .get(&DataKey::ClaimWinner(user.clone()))
-        .unwrap_or(0);
-    amount
-}
-pub fn zero_ClaimWinner(env: Env, user: Address) {
-    env.storage()
-        .persistent()
-        .set(&DataKey::ClaimWinner(user.clone()), &0);
-}
-pub fn add_ClaimWinner(env: Env, user: Address, newAmount: i128) {
-    let money: i128 = env
-        .storage()
-        .persistent()
-        .get(&DataKey::ClaimWinner(user.clone()))
-        .unwrap_or(0);
-    let total_money = money + newAmount;
-    env.storage()
-        .persistent()
-        .set(&DataKey::ClaimWinner(user.clone()), &total_money);
-}
+
 // summitter
 pub fn get_ClaimSummiter(env: Env, user: Address) -> i128 {
     let amount: i128 = env
         .storage()
         .persistent()
-        .get(&DataKey::ClaimSummiter(user.clone()))
+        .get(&DataKey::ClaimSummiter(user))
         .unwrap_or(0);
     amount
 }
@@ -474,15 +460,16 @@ pub fn zero_ClaimProtocol(env: Env) {
     env.storage().persistent().set(&DataKey::ClaimProtocol, &0);
 }
 pub fn add_ClaimProtocol(env: Env, newAmount: i128) {
-    let money: i128 = env
+    let mut currentAmount: i128 = env
         .storage()
         .persistent()
         .get(&DataKey::ClaimProtocol)
-        .unwrap_or(0);
-    let total_money = money + newAmount;
+        .unwrap_or_else(|| 0);
+
+    currentAmount += newAmount;
     env.storage()
         .persistent()
-        .set(&DataKey::ClaimProtocol, &total_money);
+        .set(&DataKey::ClaimProtocol, &currentAmount);
 }
 pub fn get_ResultAssessment(env: Env, game_id: i128) -> ResultAssessment {
     env.storage()
