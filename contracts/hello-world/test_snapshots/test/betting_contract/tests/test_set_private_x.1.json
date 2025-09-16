@@ -250,7 +250,7 @@
     ],
     [
       [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5",
         {
           "function": {
             "contract_fn": {
@@ -258,7 +258,7 @@
               "function_name": "set_private_bet",
               "args": [
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5"
                 },
                 {
                   "map": [
@@ -291,7 +291,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -328,7 +328,7 @@
                   ]
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             }
@@ -398,7 +398,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -563,7 +563,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -659,7 +659,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -715,7 +715,7 @@
                   "i128": "11"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 },
                 {
                   "vec": [
@@ -747,7 +747,7 @@
                   "i128": "0"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 },
                 {
                   "vec": [
@@ -795,7 +795,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -884,7 +884,7 @@
                   ]
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             }
@@ -913,7 +913,7 @@
                   ]
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             }
@@ -942,7 +942,7 @@
                   ]
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             }
@@ -969,7 +969,7 @@
                   ]
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             }
@@ -1140,39 +1140,6 @@
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": "1033654523790656264"
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": "1194852393571756375"
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": "1194852393571756375"
                   }
                 },
                 "durability": "temporary",
@@ -1668,7 +1635,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -1776,7 +1743,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -1821,6 +1788,45 @@
                   "vec": [
                     {
                       "symbol": "ClaimProtocol"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "i32": 0
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          0
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "ClaimProtocolTrust"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "ClaimProtocolTrust"
                     }
                   ]
                 },
@@ -1935,7 +1941,7 @@
                   "symbol": "Complain"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             },
@@ -1955,7 +1961,52 @@
                       "symbol": "Complain"
                     },
                     {
-                      "i128": "1"
+                      "i128": "51"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "i128": "0"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          0
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Fine"
+                },
+                {
+                  "i128": "51"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Fine"
+                    },
+                    {
+                      "i128": "51"
                     }
                   ]
                 },
@@ -1980,7 +2031,7 @@
                   "symbol": "Game"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             },
@@ -2000,7 +2051,7 @@
                       "symbol": "Game"
                     },
                     {
-                      "i128": "1"
+                      "i128": "51"
                     }
                   ]
                 },
@@ -2048,7 +2099,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -2312,7 +2363,7 @@
                   "symbol": "PrivateBetList"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             },
@@ -2332,7 +2383,7 @@
                       "symbol": "PrivateBetList"
                     },
                     {
-                      "i128": "1"
+                      "i128": "51"
                     }
                   ]
                 },
@@ -2420,7 +2471,7 @@
                   "symbol": "Result"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             },
@@ -2440,7 +2491,7 @@
                       "symbol": "Result"
                     },
                     {
-                      "i128": "1"
+                      "i128": "51"
                     }
                   ]
                 },
@@ -2468,7 +2519,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -2518,7 +2569,7 @@
                   "symbol": "ResultAssessment"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             },
@@ -2538,7 +2589,7 @@
                       "symbol": "ResultAssessment"
                     },
                     {
-                      "i128": "1"
+                      "i128": "51"
                     }
                   ]
                 },
@@ -2590,7 +2641,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -2598,7 +2649,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     }
                   ]
@@ -2676,7 +2727,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -2729,7 +2780,7 @@
                   "symbol": "SetPublicBet"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             },
@@ -2749,7 +2800,7 @@
                       "symbol": "SetPublicBet"
                     },
                     {
-                      "i128": "1"
+                      "i128": "51"
                     }
                   ]
                 },
@@ -2777,7 +2828,7 @@
                         "symbol": "gameid"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     },
                     {
@@ -2785,7 +2836,7 @@
                         "symbol": "id"
                       },
                       "val": {
-                        "i128": "1"
+                        "i128": "51"
                       }
                     }
                   ]
@@ -2900,7 +2951,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             },
@@ -2923,7 +2974,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
                     },
                     {
-                      "i128": "1"
+                      "i128": "51"
                     }
                   ]
                 },
@@ -2951,7 +3002,7 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             },
@@ -2974,7 +3025,7 @@
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                     },
                     {
-                      "i128": "1"
+                      "i128": "51"
                     }
                   ]
                 },
@@ -2999,7 +3050,7 @@
                   "symbol": "TotalBet"
                 },
                 {
-                  "i128": "1"
+                  "i128": "51"
                 }
               ]
             },
@@ -3019,7 +3070,7 @@
                       "symbol": "TotalBet"
                     },
                     {
-                      "i128": "1"
+                      "i128": "51"
                     }
                   ]
                 },
@@ -3232,7 +3283,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": "1200"
+                  "i128": "1400"
                 }
               }
             },
@@ -3555,6 +3606,39 @@
             "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5",
             "key": {
               "ledger_key_nonce": {
+                "nonce": "1194852393571756375"
+              }
+            },
+            "durability": "temporary"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5",
+                "key": {
+                  "ledger_key_nonce": {
+                    "nonce": "1194852393571756375"
+                  }
+                },
+                "durability": "temporary",
+                "val": "void"
+              }
+            },
+            "ext": "v0"
+          },
+          6311999
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5",
+            "key": {
+              "ledger_key_nonce": {
                 "nonce": "6517132746326325848"
               }
             },
@@ -3694,7 +3778,7 @@
                         "symbol": "amount"
                       },
                       "val": {
-                        "i128": "100001200"
+                        "i128": "100001400"
                       }
                     },
                     {
@@ -3834,7 +3918,7 @@
                         "symbol": "amount"
                       },
                       "val": {
-                        "i128": "1600"
+                        "i128": "1400"
                       }
                     },
                     {
@@ -4124,6 +4208,76 @@
                   "symbol": "Balance"
                 },
                 {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CDLDVFKHEZ2RVB3NG4UQA4VPD3TSHV6XMHXMHP2BSGCJ2IIWVTOHGDSG",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "Balance"
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "amount"
+                      },
+                      "val": {
+                        "i128": "300"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "authorized"
+                      },
+                      "val": {
+                        "bool": true
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "clawback"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          0
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CDLDVFKHEZ2RVB3NG4UQA4VPD3TSHV6XMHXMHP2BSGCJ2IIWVTOHGDSG",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "Balance"
+                },
+                {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 }
               ]
@@ -4226,7 +4380,7 @@
                         "symbol": "amount"
                       },
                       "val": {
-                        "i128": "300"
+                        "i128": "0"
                       }
                     },
                     {

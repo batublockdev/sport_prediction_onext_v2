@@ -18,8 +18,8 @@ pub trait betting {
     fn claim_refund(env: Env, user: Address, setting: i128);
     fn set_game(env: Env, game: Game, signature: BytesN<64>, pub_key: BytesN<32>);
     fn set_private_bet(env: Env, user: Address, privateData: PrivateBet, game_id: i128);
-    fn add_user_privateBet(env: Env, setting: i128, game: i128, newUser: Address);
-    fn summitResult(env: Env, user: Address, result: ResultGame) -> ResultGame;
+    fn add_user_privateBet(env: Env, setting: i128, game: i128, newUser: Address, amountFee: i128);
+    fn summitResult(env: Env, user: Address, result: ResultGame);
     fn assessResult(env: Env, user: Address, setting: i128, game_id: i128, desition: AssessmentKey);
     fn claim(env: Env, user: Address, typeClaim: ClaimType, setting: i128);
     fn setResult_supremCourt(env: Env, result: ResultGame);

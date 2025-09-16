@@ -6,4 +6,4 @@ pub(crate) const LESS_HUNDRED_POINTS: i128 = -100;
 pub(crate) const HUNDRED_POINTS: i128 = 100;
 pub(crate) const FIFTY_PERCENT: i128 = 50;
 pub(crate) const TEN_PERCENT: i128 = 10;
-pub(crate) const TWENTY_PERCENT: i128 = 30;
+pub(crate) const TWENTY_PERCENT: i128 = 20;

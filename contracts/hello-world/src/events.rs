@@ -1,23 +1,94 @@
+use crate::types::{
+    AssessmentKey, Bet, BetKey, BetType, ClaimType, DataKey, Game, LastB, PrivateBet, PublicBet,
+    ResultAssessment, ResultGame,
+};
 use soroban_sdk::{contractevent, vec, Address, Env, String, Symbol, Vec};
 
-#[contractevent(topics = ["BettingGame", "Seleted_Suimmiters"], data_format = "single-value")]
+#[contractevent(topics = ["BettingGame", "Seleted_Suimmiters"], data_format = "vec")]
 struct SummitersSeletedEvent {
     game_id: i128,
+    summiters: Vec<Address>,
+    main: Address,
+}
+
+#[contractevent(topics = ["BettingGame", "Game_Set"], data_format = "single-value")]
+struct GameSetEvent {
+    game_id: i128,
+}
+
+#[contractevent(topics = ["BettingGame", "Private_Setting"], data_format = "vec")]
+struct PrivateSettingEvent {
+    game_id: i128,
+    setting: i128,
+    admin: Address,
+    minAmount: i128,
+}
+#[contractevent(topics = ["BettingGame", "Private_Setting_newUser"], data_format = "vec")]
+struct NewUserAddedPrivateEvent {
+    game_id: i128,
+    setting: i128,
+    Newuser: Address,
+}
+#[contractevent(topics = ["BettingGame", "Game_Result"], data_format = "vec")]
+struct GameResultEvent {
+    game_id: i128,
+    result: BetKey,
+}
+
+#[contractevent(topics = ["BettingGame", "Game_Result_Reject"], data_format = "single-value")]
+struct GameResultRejectEvent {
+    game_id: i128,
+}
+#[contractevent(topics = ["BettingGame", "Game_Setting_Distributed"], data_format = "single-value")]
+struct GameSettingDistributedEvent {
+    setting: i128,
+}
+#[contractevent(topics = ["BettingGame", "Game_StakeMinAmount"], data_format = "single-value")]
+struct StakeMinAmountdEvent {
+    NewAmount: i128,
 }
 
 pub struct BettingEvents {}
 
 impl BettingEvents {
     pub fn summiters_seleted(e: &Env, game_id: i128, summiters: Vec<Address>, main: Address) {
-        SummitersSeletedEvent { game_id }.publish(&e);
+        SummitersSeletedEvent {
+            game_id,
+            summiters,
+            main,
+        }
+        .publish(&e);
     }
-
-    /// Emitted when a proposal is canceled
-    ///
-    /// - topics - `["proposal_canceled", proposal_id: u32]`
-    /// - data - ()
-    pub fn proposal_canceled(e: &Env, proposal_id: u32) {
-        let topics = (Symbol::new(&e, "proposal_canceled"), proposal_id);
-        e.events().publish(topics, ());
+    pub fn game_set(e: &Env, game_id: i128) {
+        GameSetEvent { game_id }.publish(&e);
+    }
+    pub fn private_setting(e: &Env, game_id: i128, setting: i128, admin: Address, minAmount: i128) {
+        PrivateSettingEvent {
+            game_id,
+            setting,
+            admin,
+            minAmount,
+        }
+        .publish(&e);
+    }
+    pub fn new_user_added_private(e: &Env, game_id: i128, setting: i128, Newuser: Address) {
+        NewUserAddedPrivateEvent {
+            game_id,
+            setting,
+            Newuser,
+        }
+        .publish(&e);
+    }
+    pub fn game_result(e: &Env, game_id: i128, result: BetKey) {
+        GameResultEvent { game_id, result }.publish(&e);
+    }
+    pub fn game_result_reject(e: &Env, game_id: i128) {
+        GameResultRejectEvent { game_id }.publish(&e);
+    }
+    pub fn game_setting_distributed(e: &Env, setting: i128) {
+        GameSettingDistributedEvent { setting }.publish(&e);
+    }
+    pub fn set_stake_amount(e: &Env, NewAmount: i128) {
+        StakeMinAmountdEvent { NewAmount }.publish(&e);
     }
 }

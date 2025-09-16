@@ -287,16 +287,74 @@ pub fn add_listUsuers(env: Env, gameid: i128, user: Address) {
 }
 
 pub fn set_game(env: Env, game: Game) {
+    let gameReceive = env
+        .storage()
+        .persistent()
+        .get(&DataKey::Game(game.id))
+        .unwrap_or(Game {
+            id: 0,
+            active: false,
+            league: 0,
+            description: String::from_slice(&env, "No game found"),
+            team_local: 0,
+            team_away: 0,
+            startTime: 0,
+            endTime: 0,
+            summiter: Address::from_string(&String::from_str(
+                &env,
+                "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+            )),
+            Checker: Vec::new(&env),
+        });
+    if gameReceive.id != 0 {
+        panic!("Game with this ID already exists");
+    }
     env.storage()
         .persistent()
         .set(&DataKey::Game(game.id), &game);
 }
 pub fn set_privateSetting(env: Env, privateBet: PrivateBet) {
+    self::verifySettingId(env.clone(), privateBet.id);
     env.storage()
         .persistent()
         .set(&DataKey::SetPrivateBet(privateBet.id), &privateBet);
 }
+pub fn verifySettingId(env: Env, SettingId: i128) {
+    let publicBet = env
+        .storage()
+        .persistent()
+        .get(&DataKey::SetPublicBet(SettingId))
+        .unwrap_or(PublicBet {
+            id: 0,
+            gameid: 0,
+            active: false,
+            description: String::from_slice(&env, "No public bet found"),
+        });
+    if publicBet.id != 0 {
+        panic!("Public setting with this ID already exists");
+    }
+    let privateBet = env
+        .storage()
+        .persistent()
+        .get(&DataKey::SetPrivateBet(SettingId))
+        .unwrap_or(PrivateBet {
+            id: 0,
+            gameid: 0,
+            active: false,
+            settingAdmin: Address::from_string(&String::from_str(
+                &env,
+                "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+            )),
+            description: String::from_slice(&env, "No private bet found"),
+            amount_bet_min: 0,
+            users_invated: Vec::new(&env),
+        });
+    if privateBet.id != 0 {
+        panic!("Private setting with this ID already exists");
+    }
+}
 pub fn set_publicSetting(env: Env, publicBet: PublicBet) {
+    self::verifySettingId(env.clone(), publicBet.id);
     env.storage()
         .persistent()
         .set(&DataKey::SetPublicBet(publicBet.id), &publicBet);
@@ -324,6 +382,19 @@ pub fn get_game(env: Env, game_id: i128) -> Game {
         });
     game
 }
+pub fn set_fines_applied(env: Env, gameid: i128, fine: i128) {
+    env.storage()
+        .persistent()
+        .set(&DataKey::FinesApplied(gameid), &fine);
+}
+pub fn get_fines_applied(env: Env, gameid: i128) -> i128 {
+    let fine = env
+        .storage()
+        .persistent()
+        .get(&DataKey::FinesApplied(gameid))
+        .unwrap_or(0);
+    fine
+}
 pub fn add_Fine(env: Env, gameid: i128, finex: i128) {
     let fines: i128 = env
         .storage()
@@ -336,7 +407,7 @@ pub fn add_Fine(env: Env, gameid: i128, finex: i128) {
         .set(&DataKey::Fine(gameid), &total_fine);
 }
 pub fn zero_Fine(env: Env, gameid: i128) {
-    let zero = 0;
+    let zero: i128 = 0;
     env.storage()
         .persistent()
         .set(&DataKey::Fine(gameid), &zero);
@@ -447,7 +518,30 @@ pub fn add_ClaimSummiter(env: Env, user: Address, newAmount: i128) {
         .persistent()
         .set(&DataKey::ClaimSummiter(user.clone()), &total_money);
 }
+/// protocol trust
+pub fn get_ClaimProtocolTrust(env: Env) -> i128 {
+    let amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::ClaimProtocolTrust)
+        .unwrap_or(0);
+    amount
+}
+
+pub fn add_ClaimProtocolTrust(env: Env, newAmount: i128) {
+    let mut currentAmount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::ClaimProtocolTrust)
+        .unwrap_or_else(|| 0);
+
+    currentAmount += newAmount;
+    env.storage()
+        .persistent()
+        .set(&DataKey::ClaimProtocolTrust, &currentAmount);
+}
 // protocol
+///
 pub fn get_ClaimProtocol(env: Env) -> i128 {
     let amount: i128 = env
         .storage()
@@ -458,6 +552,9 @@ pub fn get_ClaimProtocol(env: Env) -> i128 {
 }
 pub fn zero_ClaimProtocol(env: Env) {
     env.storage().persistent().set(&DataKey::ClaimProtocol, &0);
+    env.storage()
+        .persistent()
+        .set(&DataKey::ClaimProtocolTrust, &0);
 }
 pub fn add_ClaimProtocol(env: Env, newAmount: i128) {
     let mut currentAmount: i128 = env
