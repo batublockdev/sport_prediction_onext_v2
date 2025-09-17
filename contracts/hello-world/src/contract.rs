@@ -10,8 +10,9 @@ use crate::{
         PublicBet, ResultAssessment, ResultGame,
     },
     Constants::{
-        FIFTY_PERCENT, HUNDRED_POINTS, LESS_HUNDRED_POINTS, ONE_HOUR_SECONDS, SCORE_HISTORY_WEIGHT,
-        TEN_PERCENT, TRUST_TOKEN_PERCENTAGE, TWENTY_PERCENT, VOTE_HISTORY_WEIGHT,
+        FIFTY_PERCENT, FIFTY_POINTS, HUNDRED_POINTS, LESS_HUNDRED_POINTS, MINUS_TWENTY_POINTS,
+        ONE_HOUR_SECONDS, SCORE_HISTORY_WEIGHT, TEN_PERCENT, TRUST_TOKEN_PERCENTAGE,
+        TWENTY_PERCENT, TWENTY_POINTS, VOTE_HISTORY_WEIGHT,
     },
 };
 use soroban_sdk::{
@@ -48,6 +49,7 @@ impl betting for BettingContract {
        @param stakeAmount i128 The amount to stake
     */
     fn request_result_summiter(env: Env, user: Address, stakeAmount: i128) -> bool {
+        //add the fun that allows user to be summiter using his honesty points
         user.require_auth();
         let min_stake = storage::get_Min_stakeAmount(env.clone());
         if stakeAmount <= min_stake {
@@ -130,7 +132,6 @@ impl betting for BettingContract {
                 bet.clone().amount_bet,
                 bet.clone().bet,
             );
-            storage::add_listUsuers(env.clone(), publicBet.clone().gameid, user.clone());
             if !publicBet.active {
                 if storage::does_bet_active(env.clone(), bet.clone()) {
                     storage::active_public_setting(env.clone(), bet.clone().Setting, true);
@@ -141,6 +142,9 @@ impl betting for BettingContract {
             }
         }
         storage::add_total_bet(env.clone(), bet.clone().gameid, bet.clone().amount_bet);
+        storage::add_HonestyPoints(env.clone(), user.clone(), MINUS_TWENTY_POINTS);
+        let points = storage::get_HonestyPoints(env.clone(), user.clone());
+        BettingEvents::user_honesty_points(&env, user.clone(), points);
         Self::moveToken(
             &env,
             &usd,
@@ -250,6 +254,9 @@ impl betting for BettingContract {
                 &user,
                 &((betData.clone().amount_bet * TRUST_TOKEN_PERCENTAGE) / 100),
             );
+            storage::add_HonestyPoints(env.clone(), user.clone(), TWENTY_POINTS);
+            let points = storage::get_HonestyPoints(env.clone(), user.clone());
+            BettingEvents::user_honesty_points(&env, user.clone(), points);
             storage::set_didUserWithdraw(env.clone(), user.clone(), setting.clone());
         } else {
             panic_with_error!(&env, BettingError::NothingToClaim);
@@ -331,6 +338,7 @@ impl betting for BettingContract {
     @param newUser Address The address of the new user to be added
      */
     fn add_user_privateBet(env: Env, setting: i128, game: i128, newUser: Address, amountFee: i128) {
+        // add fun that allows users to be added in private rooms because of his honesty points
         let mut privateBet: PrivateBet = storage::get_PrivateBet(env.clone(), setting.clone());
         privateBet.settingAdmin.require_auth();
         let (exist, startTime, endTime, summiter, checkers, _) =
@@ -635,6 +643,9 @@ impl betting for BettingContract {
                             let trust_amount = (amountBet * TRUST_TOKEN_PERCENTAGE) / 100;
                             Self::moveToken(&env, &trust, &contract_address, &user, &trust_amount);
                         }
+                        storage::add_HonestyPoints(env.clone(), user.clone(), FIFTY_POINTS);
+                        let points = storage::get_HonestyPoints(env.clone(), user.clone());
+                        BettingEvents::user_honesty_points(&env, user.clone(), points);
                         storage::set_didUserWithdraw(env.clone(), user.clone(), setting.clone());
                     }
                     1 => {
@@ -645,6 +656,9 @@ impl betting for BettingContract {
                         Self::moveToken(&env, &usd, &contract_address, &user, &total);
                         let trust_amount = (amountBet * TRUST_TOKEN_PERCENTAGE) / 100;
                         Self::moveToken(&env, &trust, &contract_address, &user, &trust_amount);
+                        storage::add_HonestyPoints(env.clone(), user.clone(), FIFTY_POINTS);
+                        let points = storage::get_HonestyPoints(env.clone(), user.clone());
+                        BettingEvents::user_honesty_points(&env, user.clone(), points);
                         storage::set_didUserWithdraw(env.clone(), user.clone(), setting.clone());
                     }
                     _ => {
@@ -746,6 +760,7 @@ impl betting for BettingContract {
         }
 
         storage::set_ResultGame(env.clone(), result.clone());
+        BettingEvents::game_result_supreme(&env, result.gameid, result.result);
     }
     /*
        @dev This function execute the distribution of the pools according to the rules, fines and betting

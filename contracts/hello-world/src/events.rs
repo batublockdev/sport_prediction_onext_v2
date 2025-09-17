@@ -34,6 +34,16 @@ struct GameResultEvent {
     game_id: i128,
     result: BetKey,
 }
+#[contractevent(topics = ["BettingGame", "Game_ResultbySupremeCourt"], data_format = "vec")]
+struct GameResultSupremeEvent {
+    game_id: i128,
+    result: BetKey,
+}
+#[contractevent(topics = ["BettingGame", "UserHonestyPoints"], data_format = "vec")]
+struct UserHonestyPointsEvent {
+    user: Address,
+    points: i128,
+}
 
 #[contractevent(topics = ["BettingGame", "Game_Result_Reject"], data_format = "single-value")]
 struct GameResultRejectEvent {
@@ -90,5 +100,11 @@ impl BettingEvents {
     }
     pub fn set_stake_amount(e: &Env, NewAmount: i128) {
         StakeMinAmountdEvent { NewAmount }.publish(&e);
+    }
+    pub fn game_result_supreme(e: &Env, game_id: i128, result: BetKey) {
+        GameResultSupremeEvent { game_id, result }.publish(&e);
+    }
+    pub fn user_honesty_points(e: &Env, user: Address, points: i128) {
+        UserHonestyPointsEvent { user, points }.publish(&e);
     }
 }

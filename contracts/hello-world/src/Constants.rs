@@ -7,3 +7,6 @@ pub(crate) const HUNDRED_POINTS: i128 = 100;
 pub(crate) const FIFTY_PERCENT: i128 = 50;
 pub(crate) const TEN_PERCENT: i128 = 10;
 pub(crate) const TWENTY_PERCENT: i128 = 20;
+pub(crate) const TWENTY_POINTS: i128 = 20;
+pub(crate) const MINUS_TWENTY_POINTS: i128 = -20;
+pub(crate) const FIFTY_POINTS: i128 = 50;

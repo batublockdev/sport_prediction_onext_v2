@@ -84,6 +84,7 @@ pub enum DataKey {
     Game(i128),
     TotalBet(i128),
     Result(i128),
+    HonestyPoints(Address),
     ClaimWinner(Address),
     ClaimSummiter(Address),
     ClaimProtocol,

@@ -2,6 +2,7 @@
 mod tests {
 
     use std::env;
+    use std::string::ToString;
 
     use super::*;
     use crate::storage;
@@ -22,7 +23,8 @@ mod tests {
         },
         testutils::{Address as _, Ledger, LedgerInfo},
         xdr::WriteXdr,
-        Address, Bytes, BytesN, BytesN as _, InvokeError, String, TryIntoVal, Val,
+        Address, Bytes, BytesN, BytesN as _, InvokeError, String, Symbol, Symbol as _, TryIntoVal,
+        Val,
     };
     use token::Client as TokenClient;
     use token::StellarAssetClient as TokenAdminClient;
@@ -37,6 +39,112 @@ mod tests {
             token::Client::new(e, &sac.address()),
             token::StellarAssetClient::new(e, &sac.address()),
         )
+    }
+    fn events_handler(
+        env: Env,
+        all_events: std::vec::Vec<
+            soroban_sdk::Vec<(
+                soroban_sdk::Address,
+                soroban_sdk::Vec<soroban_sdk::Val>,
+                soroban_sdk::Val,
+            )>,
+        >,
+    ) {
+        for event in all_events.iter() {
+            for e in event.iter() {
+                let (contract_id, topics, value) = e;
+
+                for topic in topics.iter() {
+                    let sym: Result<soroban_sdk::Symbol, _> = topic.try_into_val(&env);
+                    match sym {
+                        Ok(symbol) => {
+                            if symbol != soroban_sdk::Symbol::new(&env, "BettingGame")
+                                && symbol != soroban_sdk::Symbol::new(&env, "transfer")
+                            {
+                                std::println!("Topic: {:?}", symbol);
+
+                                // Convert symbol to string for easier matching
+                                let symbol_str: std::string::String = symbol.to_string();
+
+                                if symbol_str == "Game_Set" {
+                                    let game_id: i128 = value.try_into_val(&env).unwrap();
+                                    std::println!("Event GameSet - Game ID: {}", game_id,);
+                                } else if symbol_str == "Private_Setting" {
+                                    let raw: SorobanVec<Val> = value.try_into_val(&env).unwrap();
+                                    let game_id: i128 =
+                                        raw.get(1).unwrap().try_into_val(&env).unwrap();
+                                    let setting_id: i128 =
+                                        raw.get(3).unwrap().try_into_val(&env).unwrap();
+                                    let user: Address =
+                                      raw.get(0).unwrap().try_into_val(&env).unwrap();
+                                    let amount_bet: i128 =
+                                     raw.get(2).unwrap().try_into_val(&env).unwrap();
+                                    std::println!(
+                                "Event PrivateSetting- Game ID: {}, Admin User: {:?}, Setting: {}, Amount Bet: {}",
+                                game_id, user,setting_id ,amount_bet 
+                            );
+                                } else if symbol_str == "Game_Result" {
+                                    let raw: SorobanVec<Val> = value.try_into_val(&env).unwrap();
+                                    let game_id: i128 =
+                                        raw.get(0).unwrap().try_into_val(&env).unwrap();
+                                    let result: BetKey =
+                                        raw.get(1).unwrap().try_into_val(&env).unwrap();
+                                    std::println!(
+                                        "Event summit_result - Game ID: {}, Result: {:?}",
+                                        game_id,
+                                        result
+                                    );
+                                } else if symbol_str == "Seleted_Suimmiters" {
+                                    let raw: SorobanVec<Val> = value.try_into_val(&env).unwrap();
+
+                                    let game_id: i128 =
+                                        raw.get(0).unwrap().try_into_val(&env).unwrap();
+                                    let main: Address =
+                                        raw.get(1).unwrap().try_into_val(&env).unwrap();
+                                    let summiters: SorobanVec<Address> =
+                                        raw.get(2).unwrap().try_into_val(&env).unwrap();
+
+                                    std::println!("Game ID: {}", game_id);
+                                    std::println!("Main: {:?}", main);
+                                    for s in summiters.iter() {
+                                        std::println!("Summiter: {:?}", s);
+                                    }
+                                }
+                                else if symbol_str == "Game_Result_Reject" {
+                                    let game_id: i128 = value.try_into_val(&env).unwrap();
+                                    std::println!("Event GameSet Reject - Game ID: {}", game_id,);
+                                }
+                                else if symbol_str == "Game_ResultbySupremeCourt" {
+                                    let raw: SorobanVec<Val> = value.try_into_val(&env).unwrap();
+                                    let game_id: i128 =
+                                        raw.get(0).unwrap().try_into_val(&env).unwrap();
+                                    let result: BetKey =
+                                        raw.get(1).unwrap().try_into_val(&env).unwrap();
+                                    std::println!(
+                                        "Event summit_result - Game ID: {}, Result: {:?}",
+                                        game_id,
+                                        result
+                                    );
+                                }
+                                else if symbol_str == "UserHonestyPoints" {
+                                    let raw: SorobanVec<Val> = value.try_into_val(&env).unwrap();
+                                    let user: Address =
+                                        raw.get(1).unwrap().try_into_val(&env).unwrap();
+                                    let points: i128 =
+                                        raw.get(0).unwrap().try_into_val(&env).unwrap();
+                                    std::println!(
+                                        "Event Users Points - User: {:?}, Poins: {:?}",
+                                        user,
+                                        points
+                                    );
+                                }
+                            }
+                        }
+                        Err(_) => std::println!(" "),
+                    }
+                }
+            }
+        }
     }
     fn create_test_env() -> (
         Env,
@@ -1600,6 +1708,8 @@ mod tests {
         ) = create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
 
+        let mut all_events = Vec::new();
+
         // Set up a game
         let game_id = 51;
         let game = Game {
@@ -1623,6 +1733,7 @@ mod tests {
         let signaturex: BytesN<64> =
             BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
         client.set_game(&game, &signaturex, &public_key);
+        all_events.push(env.events().all());
 
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
@@ -1653,6 +1764,8 @@ mod tests {
             users_invated: vec![&env, user.clone(), user2.clone()],
         };
         client.set_private_bet(&user2, &privateSetting, &game_id);
+        all_events.push(env.events().all());
+
         //let's bet to active the game
         let bet = Bet {
             id: 1,
@@ -1667,6 +1780,8 @@ mod tests {
         let initial_trust_balance = token_trust_client.balance(&user);
         std::println!("User1 honest balance initial {:?}", initial_usd_balance);
         client.bet(&user, &bet);
+        all_events.push(env.events().all());
+
         adm_usd.mint(&user2, &100_000_000);
         adm_trust.mint(&user2, &100_000_000);
 
@@ -1682,6 +1797,8 @@ mod tests {
         std::println!("User2 novote balance initial {:?}", initial_usd_balance);
 
         client.bet(&user2, &betx);
+        all_events.push(env.events().all());
+
         // Set ledger timestamp after game end
         set_ledger_timestamp(&env, 2500);
 
@@ -1702,31 +1819,28 @@ mod tests {
             distribution_executed: false,
         };
         client.summitResult(&summiter2, &result);
+        all_events.push(env.events().all());
 
         client.assessResult(&user, &11, &game_id, &AssessmentKey::reject);
+        all_events.push(env.events().all());
         client.assessResult(&summiter, &0, &game_id, &AssessmentKey::reject);
 
         client.setResult_supremCourt(&result2);
+        all_events.push(env.events().all());
+
         // Execute distribution
 
         client.claim(&user, &ClaimType::User, &11);
+        all_events.push(env.events().all());
+
         //client.claim(&user2, &ClaimType::User, &11);
         client.claim(&summiter, &ClaimType::Summiter, &game_id);
         client.claim(&summiter2, &ClaimType::Summiter, &game_id);
         client.claim(&admin, &ClaimType::Protocol, &game_id);
+        all_events.push(env.events().all());
 
         // Verify token transfers (winner gets bet + share of pool)
-        let events = env.events().all();
-        for event in events.iter() {
-            let (contract_id, topics, value) = event;
-            for topic in topics.iter() {
-                let sym: Result<soroban_sdk::Symbol, _> = topic.try_into_val(&env);
-                match sym {
-                    Ok(symbol) => std::println!("Topic: {:?}", symbol),
-                    Err(_) => std::println!("Topic (raw): {:?}", topic),
-                }
-            }
-        }
+        events_handler(env.clone(), all_events);
         std::println!("User balance final {:?}", token_usd_client.balance(&user));
         std::println!("User2 balance final {:?}", token_usd_client.balance(&user2));
         std::println!(

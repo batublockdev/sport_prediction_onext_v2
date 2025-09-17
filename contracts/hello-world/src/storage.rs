@@ -273,18 +273,6 @@ pub fn get_PrivateBet(env: Env, setting: i128) -> PrivateBet {
             users_invated: Vec::new(&env),
         })
 }
-pub fn add_listUsuers(env: Env, gameid: i128, user: Address) {
-    let mut listedBetAddress: Vec<(Address)> = env
-        .storage()
-        .persistent()
-        .get(&DataKey::ListBetUser(gameid))
-        .unwrap_or(Vec::new(&env));
-
-    listedBetAddress.push_back(user.clone());
-    env.storage()
-        .persistent()
-        .set(&DataKey::ListBetUser(gameid), &listedBetAddress);
-}
 
 pub fn set_game(env: Env, game: Game) {
     let gameReceive = env
@@ -319,6 +307,26 @@ pub fn set_privateSetting(env: Env, privateBet: PrivateBet) {
         .persistent()
         .set(&DataKey::SetPrivateBet(privateBet.id), &privateBet);
 }
+pub fn add_HonestyPoints(env: Env, user: Address, points: i128) {
+    let honesty: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::HonestyPoints(user.clone()))
+        .unwrap_or(0);
+    let total_honesty = honesty + points;
+    env.storage()
+        .persistent()
+        .set(&DataKey::HonestyPoints(user.clone()), &total_honesty);
+}
+pub fn get_HonestyPoints(env: Env, user: Address) -> i128 {
+    let honesty: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::HonestyPoints(user.clone()))
+        .unwrap_or(0);
+    honesty
+}
+
 pub fn verifySettingId(env: Env, SettingId: i128) {
     let publicBet = env
         .storage()
