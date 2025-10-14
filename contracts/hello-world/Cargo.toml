@@ -5,16 +5,16 @@ edition = "2021"
 publish = false
 
 [lib]
-crate-type = ["rlib", "cdylib"]
+crate-type = ["cdylib"]   # Only cdylib needed
 doctest = false
-
 
 [dependencies]
 soroban-sdk = { version = "23.0.1" }
 
-ed25519-dalek = { version = "1.0.1" }
-rand = { version = "0.7.3" }
 [dev-dependencies]
 soroban-sdk = { version = "23.0.1", features = ["testutils"] }
+ed25519-dalek = { version = "1.0.1" }
+rand = { version = "0.7.3" }
+
 [features]
 testutils = ["soroban-sdk/testutils"]

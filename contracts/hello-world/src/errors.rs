@@ -15,7 +15,7 @@ pub enum BettingError {
     AllowanceError = 9,
     BalanceError = 10,
     OverflowError = 12,
-
+    GameNoResult = 299,
     GameDoesNotExist = 200,
     SettingBetDoesNotExist = 201,
     PrivateBet_NotAllowToBet = 202,

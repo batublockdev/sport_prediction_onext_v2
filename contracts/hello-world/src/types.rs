@@ -82,6 +82,8 @@ pub struct Bet {
 #[contracttype]
 pub enum DataKey {
     Game(i128),
+    AmountUsers(i128),
+    AmountUsersVoted(i128),
     TotalBet(i128),
     Result(i128),
     HonestyPoints(Address),

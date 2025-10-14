@@ -2,8 +2,10 @@ use crate::types::{
     AssessmentKey, Bet, BetKey, BetType, ClaimType, DataKey, Game, LastB, PrivateBet, PublicBet,
     ResultAssessment, ResultGame,
 };
-use soroban_sdk::{symbol_short, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{symbol_short, Address, BytesN, Env, String, Symbol, Vec};
 const ADMIN_KEY: Symbol = Symbol::short("ADMIN");
+const ADMIN_PUB_KEY: Symbol = Symbol::short("Adm_key");
+
 const SUPREME_KEY: Symbol = Symbol::short("SUPREME");
 const TOKEN_USD_KEY: Symbol = Symbol::short("TOKEN_USD");
 const TOKEN_TRUST_KEY: Symbol = Symbol::short("TK_TRUST");
@@ -24,12 +26,15 @@ pub fn has_init(env: &Env) -> bool {
 pub fn init(
     env: Env,
     admin: Address,
+    admin_pubkey: BytesN<32>,
     token_usd: Address,
     token_trust: Address,
     supreme_court: Address,
 ) {
     // save the admin
     env.storage().instance().set(&ADMIN_KEY, &admin);
+    env.storage().instance().set(&ADMIN_PUB_KEY, &admin_pubkey);
+
     // save the token addresses
     env.storage().instance().set(&TOKEN_USD_KEY, &token_usd);
     env.storage().instance().set(&TOKEN_TRUST_KEY, &token_trust);
@@ -57,6 +62,12 @@ pub fn get_admin(env: Env) -> Address {
     env.storage()
         .instance()
         .get(&ADMIN_KEY)
+        .unwrap_or_else(|| panic!("contract not initialized"))
+}
+pub fn get_admin_pubkey(env: Env) -> BytesN<32> {
+    env.storage()
+        .instance()
+        .get(&ADMIN_PUB_KEY)
         .unwrap_or_else(|| panic!("contract not initialized"))
 }
 pub fn get_history(env: Env, user: Address) -> i128 {
@@ -326,7 +337,46 @@ pub fn get_HonestyPoints(env: Env, user: Address) -> i128 {
         .unwrap_or(0);
     honesty
 }
+pub fn add_UsersAmount(env: Env, game_setting: i128) {
+    let amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::AmountUsers(game_setting))
+        .unwrap_or(0);
+    let total = amount + 1;
+    env.storage()
+        .persistent()
+        .set(&DataKey::AmountUsers(game_setting), &total);
+}
 
+pub fn UsersAmount(env: Env, game_setting: i128) -> bool {
+    let amountX: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::AmountUsersVoted(game_setting))
+        .unwrap_or(0);
+    let amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::AmountUsers(game_setting))
+        .unwrap_or(0);
+    if amountX == amount {
+        true
+    } else {
+        false
+    }
+}
+pub fn add_UsersAmountVoted(env: Env, game_setting: i128) {
+    let amount: i128 = env
+        .storage()
+        .persistent()
+        .get(&DataKey::AmountUsersVoted(game_setting))
+        .unwrap_or(0);
+    let total = amount + 1;
+    env.storage()
+        .persistent()
+        .set(&DataKey::AmountUsersVoted(game_setting), &total);
+}
 pub fn verifySettingId(env: Env, SettingId: i128) {
     let publicBet = env
         .storage()

@@ -14,7 +14,7 @@ mod tests {
     use ed25519_dalek::{Keypair, Signer};
     use rand::thread_rng;
     use soroban_sdk::xdr::ToXdr;
-    use soroban_sdk::Vec as SorobanVec;
+    use soroban_sdk::{FromVal, Vec as SorobanVec};
     use soroban_sdk::{symbol_short, token};
     use soroban_sdk::{testutils::Events, vec, Env, IntoVal};
     use soroban_sdk::{
@@ -150,6 +150,8 @@ mod tests {
         Env,
         BettingContractClient<'static>,
         Address,
+        Keypair,
+        BytesN::<32>,
         Address,
         Address,
         Address,
@@ -162,13 +164,19 @@ mod tests {
         env.mock_all_auths(); // Mock all authorizations for testing
 
         // Create mock accounts
-        let admin = Address::generate(&env);
+let adminPk = Keypair::generate(&mut thread_rng());
+        let public_key = BytesN::<32>::from_array(&env, &adminPk.public.to_bytes());
+
+let admin = Address::generate(&env);
         let user = Address::generate(&env);
         let supreme = Address::generate(&env);
 
         // Register mock token contracts
         let (token_usd, token_usd_admin) = create_token_contract(&env, &admin);
         let (token_trust, token_trust_admin) = create_token_contract(&env, &admin);
+        //pubkey byte
+
+
 
         // Mint initial tokens to user for testing
         token_usd_admin.mint(&user, &100_000_000);
@@ -176,13 +184,15 @@ mod tests {
         // Register the betting contract
         let contract_id = env.register(
             BettingContract,
-            (&admin, &token_usd.address, &token_trust.address, &supreme),
+            (&admin, public_key.clone(), &token_usd.address, &token_trust.address, &supreme),
         );
         let client = BettingContractClient::new(&env, &contract_id);
         (
             env,
             client,
             admin,
+            adminPk,
+            public_key.clone(),
             user,
             token_usd.address.clone(),
             token_trust.address.clone(),
@@ -205,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_request_result_summiter() {
-        let (env, client, admin, user, token_usd, token_trust, _, _, _, _) = create_test_env();
+        let (env, client, admin,key,pk, user, token_usd, token_trust, _, _, _, _) = create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
 
         let game_id = 1;
@@ -218,7 +228,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Error(Contract, #223)")]
     fn test_request_result_summiter_negative_amount() {
-        let (env, client, admin, user, token_usd, token_trust, _, _, _, _) = create_test_env();
+        let (env, client, admin, key,pk, user, token_usd, token_trust, _, _, _, _) = create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
 
         client.request_result_summiter(&user, &-100); // Should panic
@@ -226,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_bet_public() {
-        let (env, client, admin, user, token_usd, token_trust, usd_client, trust_client, _, _) =
+        let (env, client, admin, key,pk,user, token_usd, token_trust, usd_client, trust_client, _, _) =
             create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
 
@@ -248,12 +258,11 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
+
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex);
 
         // Place a public bet
         let bet = Bet {
@@ -279,7 +288,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Error(Contract, #207)")]
     fn test_bet_after_game_start() {
-        let (env, client, admin, user, token_usd, token_trust, _, _, _, _) = create_test_env();
+        let (env, client, admin,key,pk, user, token_usd, token_trust, _, _, _, _) = create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
 
         let game_id = 1;
@@ -298,12 +307,11 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
+
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, );
 
         set_ledger_timestamp(&env, 1500);
 
@@ -321,7 +329,7 @@ mod tests {
 
     #[test]
     fn test_claim_money_noactive_public() {
-        let (env, client, admin, user, token_usd, token_trust, usd_client, trust_client, _, _) =
+        let (env, client, admin, key, pk, user, token_usd, token_trust, usd_client, trust_client, _, _) =
             create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
 
@@ -339,15 +347,13 @@ mod tests {
             team_local: 33,
             team_away: 44,
         };
-        // Encode game to Bytes (variable length)
+        // Encode game to Bytes (variable length
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex );
 
         // Place a public bet
         let bet = Bet {
@@ -374,7 +380,7 @@ mod tests {
 
     #[test]
     fn test_summit_result() {
-        let (env, client, admin, user, token_usd, token_trust, _, _, adm_usd, adm_trust) =
+        let (env, client, admin,key,pk, user, token_usd, token_trust, _, _, adm_usd, adm_trust) =
             create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
 
@@ -395,12 +401,10 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex );
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -454,7 +458,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Error(Contract, #212)")]
     fn test_summit_result_unauthorized() {
-        let (env, client, admin, user, token_usd, token_trust, _, _, _, _) = create_test_env();
+        let (env, client, admin, key, pk, user, token_usd, token_trust, _, _, _, _) = create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
 
         let game_id = 1;
@@ -473,12 +477,10 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, );
 
         set_ledger_timestamp(&env, 2500);
 
@@ -496,7 +498,7 @@ mod tests {
 
     #[test]
     fn test_assess_result() {
-        let (env, client, admin, user, token_usd, token_trust, _, _, adm_usd, adm_trust) =
+        let (env, client, admin, key, pk, user, token_usd, token_trust, _, _, adm_usd, adm_trust) =
             create_test_env();
         //client.init(&admin, &token_usd, &token_trust);
 
@@ -517,12 +519,10 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex,);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -575,7 +575,9 @@ mod tests {
         let (
             env,
             client,
-            admin,
+            admin
+            , key
+            , pk,
             user,
             token_usd,
             token_trust,
@@ -603,12 +605,10 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex,);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -685,12 +685,11 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encodedx: Vec<u8> = gamex.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_keyx = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
+
 
         let signaturex2: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encodedx.as_slice()).to_bytes());
-        client.set_game(&gamex, &signaturex2, &public_keyx);
+            BytesN::from_array(&env, &key.sign(encodedx.as_slice()).to_bytes());
+        client.set_game(&gamex, &signaturex2, );
 
         //let's bet to active the game
         let betxz = Bet {
@@ -745,6 +744,8 @@ mod tests {
             env,
             client,
             admin,
+            key,
+            pk,
             user,
             token_usd,
             token_trust,
@@ -763,7 +764,7 @@ mod tests {
             endTime: 2000,
             summiter: Address::generate(&env),
             Checker: soroban_sdk::Vec::new(&env),
-            active: false,
+            active: true,
             league: 1,
             description: String::from_slice(&env, "Team A vs Team B"),
             team_local: 33,
@@ -772,12 +773,11 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
+
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -854,12 +854,11 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encodedx: Vec<u8> = gamex.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_keyx = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
+
 
         let signaturex2: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encodedx.as_slice()).to_bytes());
-        client.set_game(&gamex, &signaturex2, &public_keyx);
+            BytesN::from_array(&env, &key.sign(encodedx.as_slice()).to_bytes());
+        client.set_game(&gamex, &signaturex2);
 
         //let's bet to active the game
         let betxz = Bet {
@@ -914,6 +913,8 @@ mod tests {
             env,
             client,
             admin,
+            key,
+            pk,
             user,
             token_usd,
             token_trust,
@@ -941,12 +942,11 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
+
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex);
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -993,15 +993,15 @@ mod tests {
             distribution_executed: false,
         };
 
-        client.summitResult(&summiter2, &result);
+        client.summitResult(&summiter, &result);
 
         client.assessResult(&user, &game_id, &game_id, &AssessmentKey::approve);
 
-        // Execute distribution
+        // Execute distribution&¿
         client.execute_distribution(&game_id);
         // Claim as winner
 
-        client.claim(&user, &ClaimType::User, &game_id);
+        client.claim(&user, &ClaimType::User, &112);
         client.claim(&summiter2, &ClaimType::Summiter, &game_id);
 
         // Verify token transfers (winner gets bet + share of pool)
@@ -1014,6 +1014,8 @@ mod tests {
             env,
             client,
             admin,
+            key,
+            pk,
             user,
             token_usd,
             token_trust,
@@ -1041,12 +1043,11 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
+
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, );
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -1108,6 +1109,8 @@ mod tests {
             env,
             client,
             admin,
+            key,
+            pk,
             user,
             token_usd,
             token_trust,
@@ -1135,12 +1138,10 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, );
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -1221,6 +1222,8 @@ mod tests {
             env,
             client,
             admin,
+            key,
+            pk,
             user,
             token_usd,
             token_trust,
@@ -1248,12 +1251,10 @@ mod tests {
         // Encode game to Bytes (variable length)
         let encoded: Vec<u8> = game.clone().to_xdr(&env).iter().collect();
 
-        let signer1 = Keypair::generate(&mut thread_rng());
-        let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, );
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -1337,6 +1338,8 @@ mod tests {
             env,
             client,
             admin,
+            key,
+            pk,
             user,
             token_usd,
             token_trust,
@@ -1368,8 +1371,8 @@ mod tests {
         let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, );
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -1448,6 +1451,8 @@ mod tests {
             env,
             client,
             admin,
+            key,
+            pk,
             user,
             token_usd,
             token_trust,
@@ -1479,8 +1484,8 @@ mod tests {
         let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, );
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -1566,6 +1571,8 @@ mod tests {
             env,
             client,
             admin,
+            key,
+            pk,
             user,
             token_usd,
             token_trust,
@@ -1597,8 +1604,8 @@ mod tests {
         let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, );
         //add the user who wna tto participate as a summiter
         let summiter = Address::generate(&env);
         let summiter2 = Address::generate(&env);
@@ -1698,6 +1705,8 @@ mod tests {
             env,
             client,
             admin,
+            key,
+            pk,
             user,
             token_usd,
             token_trust,
@@ -1731,8 +1740,8 @@ mod tests {
         let public_key = BytesN::<32>::from_array(&env, &signer1.public.to_bytes());
 
         let signaturex: BytesN<64> =
-            BytesN::from_array(&env, &signer1.sign(encoded.as_slice()).to_bytes());
-        client.set_game(&game, &signaturex, &public_key);
+            BytesN::from_array(&env, &key.sign(encoded.as_slice()).to_bytes());
+        client.set_game(&game, &signaturex, );
         all_events.push(env.events().all());
 
         //add the user who wna tto participate as a summiter
@@ -1771,7 +1780,7 @@ mod tests {
             id: 1,
             Setting: 11,
             bet: BetKey::Team_away,
-            amount_bet: 1000,
+            amount_bet: 500,
             betType: BetType::Private,
             gameid: game_id,
         };
@@ -1789,7 +1798,7 @@ mod tests {
             id: 2,
             Setting: 11,
             bet: BetKey::Team_local,
-            amount_bet: 1000,
+            amount_bet: 500,
             betType: BetType::Private,
             gameid: game_id,
         };
@@ -1818,12 +1827,13 @@ mod tests {
             description: String::from_str(&env, "Final Score 2-1"),
             distribution_executed: false,
         };
-        client.summitResult(&summiter2, &result);
+        client.summitResult(&summiter, &result);
         all_events.push(env.events().all());
 
         client.assessResult(&user, &11, &game_id, &AssessmentKey::reject);
         all_events.push(env.events().all());
         client.assessResult(&summiter, &0, &game_id, &AssessmentKey::reject);
+                set_ledger_timestamp(&env, 20500);
 
         client.setResult_supremCourt(&result2);
         all_events.push(env.events().all());
