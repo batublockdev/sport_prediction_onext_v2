@@ -1,18 +1,23 @@
-name: Build and Release Soroban Contract
-
+name: Soroban Contract # name it whatever you like
 on:
   push:
     tags:
-      - "v*" # Triggered whenever you push a new tag, like "v1.0.0"
+      - "v*" # triggered whenever a new tag (prefixed with "v") is pushed to the repository
+
+permissions: # required permissions for the workflow
+  id-token: write
+  contents: write
+  attestations: write
 
 jobs:
-  release-contract:
+  release-contract-a:
     uses: stellar-expert/soroban-build-workflow/.github/workflows/release.yml@main
     with:
-      release_name: ${{ github.ref_name }} # Use tag name (e.g., v1.0.0)
-      release_description: "Automated Soroban contract release"
+      release_name: ${{ github.ref_name }} # use git tag as unique release name
+      release_description: "Contract release" # some boring placeholder text to attach
+      home_domain: "awesome.com" # home domain for the contract
       relative_path: '["/contracts/hello-world/src/contract.rs"]' # Path to your contract (update this)
       package: "sport_prediction_onext_v2" # Package name from Cargo.toml
-      make_target: "" # Optional: if you have Makefile target (e.g. "make build")
-    secrets:
-      release_token: ${{ secrets.GITHUB_TOKEN }}
+      make_target: "build-dependencies" # make target to invoke
+    secrets: # the authentication token will be automatically created by GitHub
+      release_token: ${{ secrets.GITHUB_TOKEN }} # don't modify this line
