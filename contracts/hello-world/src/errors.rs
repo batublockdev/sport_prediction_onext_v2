@@ -10,7 +10,7 @@ pub enum BettingError {
     InvalidInputError = 5,
 
     UnauthorizedError = 4,
-
+    SettingNotActive = 260,
     NegativeAmountError = 8,
     AllowanceError = 9,
     BalanceError = 10,

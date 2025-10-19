@@ -33,6 +33,7 @@ struct NewUserAddedPrivateEvent {
 struct GameResultEvent {
     game_id: i128,
     result: BetKey,
+    description: String,
 }
 #[contractevent(topics = ["BettingGame", "Game_ResultbySupremeCourt"], data_format = "vec")]
 struct GameResultSupremeEvent {
@@ -98,8 +99,13 @@ impl BettingEvents {
         }
         .publish(&e);
     }
-    pub fn game_result(e: &Env, game_id: i128, result: BetKey) {
-        GameResultEvent { game_id, result }.publish(&e);
+    pub fn game_result(e: &Env, game_id: i128, result: BetKey, description: String) {
+        GameResultEvent {
+            game_id,
+            result,
+            description,
+        }
+        .publish(&e);
     }
     pub fn game_result_reject(e: &Env, game_id: i128) {
         GameResultRejectEvent { game_id }.publish(&e);

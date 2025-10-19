@@ -30,6 +30,6 @@ pub trait betting {
     ) -> bool;
     fn claim(env: Env, user: Address, typeClaim: ClaimType, setting: i128) -> (i128, i128);
     fn setResult_supremCourt(env: Env, result: ResultGame) -> bool;
-    fn execute_distribution(env: Env, gameId: i128) -> bool;
+    fn execute_distribution(env: Env, gameId: i128, setting: i128) -> bool;
     fn set_stakeAmount(env: Env, user: Address, amount: i128) -> bool;
 }

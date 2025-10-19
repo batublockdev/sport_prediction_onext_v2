@@ -269,13 +269,6 @@ impl betting for BettingContract {
         env.crypto()
             .ed25519_verify(&admin_pubkey, &encoded, &signature);
         storage::set_game(env.clone(), game.clone());
-        let pubSetting = PublicBet {
-            id: game.id,
-            gameid: game.id,
-            active: false,
-            description: String::from_str(&env, "Public Bet"),
-        };
-        storage::set_publicSetting(env.clone(), pubSetting);
         BettingEvents::game_set(&env, game.id);
         true
     }
@@ -425,14 +418,19 @@ impl betting for BettingContract {
                     }
 
                     storage::set_ResultGame(env.clone(), result.clone());
-                    BettingEvents::game_result(&env, result.gameid, result.result);
+                    BettingEvents::game_result(
+                        &env,
+                        result.gameid,
+                        result.result,
+                        result.description,
+                    );
                 }
             } else {
                 if !checkers.contains(&user) {
                     panic_with_error!(&env, BettingError::NotAllowToSummitResult);
                 }
                 storage::set_ResultGame(env.clone(), result.clone());
-                BettingEvents::game_result(&env, result.gameid, result.result);
+                BettingEvents::game_result(&env, result.gameid, result.result, result.description);
             }
         } else {
             if summiter != user {
@@ -440,7 +438,7 @@ impl betting for BettingContract {
             }
 
             storage::set_ResultGame(env.clone(), result.clone());
-            BettingEvents::game_result(&env, result.gameid, result.result);
+            BettingEvents::game_result(&env, result.gameid, result.result, result.description);
         }
         true
     }
@@ -506,9 +504,8 @@ impl betting for BettingContract {
                 }
             }
             storage::add_UsersAmountVoted(env.clone(), setting.clone());
-
-            if storage::UsersAmount(env.clone(), game_id.clone()) {
-                BettingEvents::all_vote(&env, game_id.clone());
+            if storage::UsersAmount(env.clone(), setting.clone()) {
+                BettingEvents::all_vote(&env, setting.clone());
             }
             storage::set_ResultAssessment(env.clone(), game_id.clone(), resultAssessment.clone());
             storage::delete_not_assesed_yet(
@@ -754,18 +751,22 @@ impl betting for BettingContract {
        @param env Environment
        @param game_id i128 The id of the game
     */
-    fn execute_distribution(env: Env, gameId: i128) -> bool {
+    fn execute_distribution(env: Env, gameId: i128, setting: i128) -> bool {
         let complain = 2; // 2 means no complain was made
         let result: ResultGame = storage::get_ResultGame(env.clone(), gameId.clone());
         let (exist, startTime, endTime, summiter, checkers, _) =
             storage::existBet(env.clone(), result.clone().gameid);
         if endTime + (5 * ONE_HOUR_SECONDS) > env.ledger().timestamp() as u32 {
-            if !storage::UsersAmount(env.clone(), result.clone().gameid) {
+            if !storage::UsersAmount(env.clone(), setting.clone()) {
                 panic_with_error!(&env, BettingError::GameAssesmentHasFinished);
             }
         }
         let listedPrivateBet: Vec<(i128)> =
             storage::get_privateSettingList(env.clone(), result.clone().gameid);
+        let privateBet: PrivateBet = storage::get_PrivateBet(env.clone(), setting.clone());
+        if privateBet.active == false {
+            panic_with_error!(&env, BettingError::SettingNotActive);
+        }
         if result.id == 0 {
             panic_with_error!(&env, BettingError::GameNoResult);
         }
@@ -789,23 +790,18 @@ impl betting for BettingContract {
             }
         }
 
-        for setting in listedPrivateBet.iter() {
-            let privateBet: PrivateBet = storage::get_PrivateBet(env.clone(), setting.clone());
-            if privateBet.active == false {
-                continue;
-            }
-            if result.result == BetKey::Cancel {
-                storage::active_private_setting(env.clone(), setting.clone(), false);
-            } else {
-                Self::make_distribution(
-                    env.clone(),
-                    privateBet.clone().gameid,
-                    setting.clone(),
-                    result.clone().result,
-                    complain,
-                );
-            }
+        if result.result == BetKey::Cancel {
+            storage::active_private_setting(env.clone(), setting.clone(), false);
+        } else {
+            Self::make_distribution(
+                env.clone(),
+                privateBet.clone().gameid,
+                setting.clone(),
+                result.clone().result,
+                complain,
+            );
         }
+
         true
     }
     /*
